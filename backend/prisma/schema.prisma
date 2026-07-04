@@ -1,0 +1,127 @@
+// Cashflow tracking tool schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ScheduleMode {
+  EVEN
+  CUSTOM
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  client      String?
+  address     String?
+  description String?
+  projectDate DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  categories    Category[]
+  lineItems     LineItem[]
+  draws         Draw[]
+  capTable      CapTableMember[]
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  sortOrder Int      @default(0)
+
+  lineItems LineItem[]
+
+  @@unique([projectId, name])
+}
+
+model LineItem {
+  id           String        @id @default(cuid())
+  projectId    String
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  categoryId   String?
+  category     Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  code         String?
+  description  String
+  totalBudget  Decimal       @db.Decimal(18, 2)
+  scheduleMode ScheduleMode  @default(EVEN)
+  startDate    DateTime?
+  endDate      DateTime?
+  sortOrder    Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  payments PaymentEntry[]
+
+  @@index([projectId])
+}
+
+// Only used when scheduleMode = CUSTOM. Explicit date/amount rows.
+model PaymentEntry {
+  id         String   @id @default(cuid())
+  lineItemId String
+  lineItem   LineItem @relation(fields: [lineItemId], references: [id], onDelete: Cascade)
+  date       DateTime
+  amount     Decimal  @db.Decimal(18, 2)
+
+  @@index([lineItemId])
+}
+
+model Draw {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  date      DateTime
+  amount    Decimal  @db.Decimal(18, 2)
+  source    String?
+  sortOrder Int      @default(0)
+
+  @@index([projectId])
+}
+
+model CapTableMember {
+  id                String   @id @default(cuid())
+  projectId         String
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name              String
+  role              String   @default("LP")
+  // Manual ownership override (0-100). If null, ownership is computed pro-rata from contributions.
+  ownershipPercent  Decimal? @db.Decimal(7, 4)
+  sortOrder         Int      @default(0)
+
+  contributions Contribution[]
+  distributions Distribution[]
+
+  @@index([projectId])
+}
+
+model Contribution {
+  id       String         @id @default(cuid())
+  memberId String
+  member   CapTableMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  date     DateTime
+  amount   Decimal        @db.Decimal(18, 2)
+  note     String?
+
+  @@index([memberId])
+}
+
+// Distributions / "member draws" paid out to a cap table member.
+model Distribution {
+  id       String         @id @default(cuid())
+  memberId String
+  member   CapTableMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  date     DateTime
+  amount   Decimal        @db.Decimal(18, 2)
+  note     String?
+
+  @@index([memberId])
+}
