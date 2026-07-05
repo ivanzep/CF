@@ -186,6 +186,7 @@
 
   .mini-table { border-collapse: collapse; font-size: 13px; }
   .mini-table td { padding: 4px 10px 4px 0; border-bottom: 1px solid var(--border); }
+  .mini-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 500; text-align: left; padding: 4px 10px 4px 0; }
   .mini-table input { width: 130px; }
 
   .summary-grid-wrap { overflow: auto; max-height: 70vh; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
@@ -279,6 +280,7 @@
   .print-preview-bar__settings select, .print-preview-bar__settings input[type="number"] { font-size: 12px; padding: 3px 4px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.15); color: #fff; width: 64px; }
   .print-preview-bar__settings select option { color: #0b0b0b; }
   .print-preview-bar__checkbox { flex-direction: row !important; align-items: center; gap: 6px !important; }
+  .print-preview-bar__margins { display: flex; gap: 12px; }
   .print-preview-bar__label { font-weight: 600; flex: 1; }
   .print-preview-bar button { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
   .print-preview-bar button:hover { background: rgba(255,255,255,0.25); }
@@ -300,7 +302,8 @@
   .print-pages__zoom button { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 4px; padding: 2px 8px; cursor: pointer; color: var(--text-primary); }
   .print-pages__zoom span { min-width: 40px; text-align: center; font-variant-numeric: tabular-nums; }
   .print-pages__pages { display: flex; flex-direction: column; align-items: safe center; gap: 24px; transform-origin: top center; overflow-x: auto; padding: 0 4px; }
-  .print-page { background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.18); position: relative; flex-shrink: 0; }
+  .print-page-outer { position: relative; flex-shrink: 0; overflow: hidden; }
+  .print-page { background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.18); position: absolute; top: 0; left: 0; }
   .print-page__viewport { overflow: hidden; position: relative; }
   .print-page__content { position: absolute; top: 0; left: 0; }
   .print-page__header-overlay { position: absolute; top: 0; left: 0; right: 0; overflow: hidden; background: #fff; z-index: 5; }
@@ -312,6 +315,13 @@
   .recurring-draws__form input, .recurring-draws__form select { min-width: 140px; }
   .recurring-draws__checkbox { flex-direction: row !important; align-items: center; gap: 6px !important; }
   .recurring-draws__checkbox input { min-width: 0; }
+
+  .hamburger-menu { position: relative; }
+  .hamburger-menu__btn { font-size: 16px; padding: 4px 10px; line-height: 1; }
+  .hamburger-menu__panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); padding: 8px; display: flex; flex-direction: column; gap: 2px; min-width: 130px; }
+  .hamburger-menu__panel .link-button { text-align: left; padding: 6px 8px; width: 100%; }
+
+  .save-btn--dirty { font-weight: 700; color: var(--danger); }
 
   .export-csv { position: relative; }
   .export-csv__panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 50; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); padding: 14px 16px; width: 260px; display: flex; flex-direction: column; gap: 8px; }
@@ -370,15 +380,7 @@
           <option value="landscape" selected>Landscape</option>
         </select>
       </label>
-      <label>Margins
-        <select id="ppMargin">
-          <option value="narrow">Narrow</option>
-          <option value="normal" selected>Normal</option>
-          <option value="wide">Wide</option>
-          <option value="custom">Custom</option>
-        </select>
-      </label>
-      <div id="ppCustomMargins" style="display:none;">
+      <div class="print-preview-bar__margins">
         <label>Top (in)<input type="number" step="0.1" min="0" id="ppMarginTop" value="0.5" /></label>
         <label>Right (in)<input type="number" step="0.1" min="0" id="ppMarginRight" value="0.5" /></label>
         <label>Bottom (in)<input type="number" step="0.1" min="0" id="ppMarginBottom" value="0.5" /></label>
@@ -418,14 +420,21 @@
   <header class="app-topbar">
     <span class="app-topbar__title">Cashflow Tracker</span>
     <div class="app-topbar__spacer"></div>
-    <div class="export-csv" id="exportCsvWrap">
-      <button class="link-button" id="exportCsvBtn" type="button">Export CSV</button>
-      <div class="export-csv__panel" id="exportCsvPanel" style="display:none;"></div>
-    </div>
+    <button class="link-button" id="loadBtn" type="button">Load</button>
+    <button class="link-button" id="saveBtn" type="button">Save</button>
     <button class="link-button" id="printBtn" type="button">Print Preview</button>
-    <div class="theme-picker" id="themePickerWrap">
-      <button class="link-button" id="themePickerBtn" type="button">Theme</button>
-      <div class="theme-picker__panel" id="themePickerPanel" style="display:none;"></div>
+    <div class="hamburger-menu" id="hamburgerWrap">
+      <button class="link-button hamburger-menu__btn" id="hamburgerBtn" type="button" aria-label="More options">☰</button>
+      <div class="hamburger-menu__panel" id="hamburgerPanel" style="display:none;">
+        <div class="export-csv" id="exportCsvWrap">
+          <button class="link-button" id="exportCsvBtn" type="button">Export CSV</button>
+          <div class="export-csv__panel" id="exportCsvPanel" style="display:none;"></div>
+        </div>
+        <div class="theme-picker" id="themePickerWrap">
+          <button class="link-button" id="themePickerBtn" type="button">Theme</button>
+          <div class="theme-picker__panel" id="themePickerPanel" style="display:none;"></div>
+        </div>
+      </div>
     </div>
   </header>
   <div id="bootMessage" class="section__intro" style="padding: 0 0 16px;">Loading your data…</div>
@@ -446,7 +455,7 @@
 
   // ---------- state ----------
   var project = null;
-  var activeTab = "cashflow";
+  var activeTab = "summary";
   var expandedLineItemId = null;
   var expandedMemberId = null;
   var chartCollapsed = true;
@@ -457,7 +466,7 @@
   var showDrawGenerator = false;
   var previewMode = false;
   var printSettings = {
-    pageSize: "letter", orientation: "landscape", margin: "normal",
+    pageSize: "letter", orientation: "landscape",
     marginTopIn: 0.5, marginRightIn: 0.5, marginBottomIn: 0.5, marginLeftIn: 0.5,
     fontSize: "normal", rowSize: "normal", colorMode: "color", repeatHeader: true,
   };
@@ -576,20 +585,50 @@
     return Promise.reject(new Error("Unknown action: " + action));
   }
 
+  var isDirty = false;
+  function updateSaveIndicator() {
+    var btn = document.getElementById("saveBtn");
+    if (!btn) return;
+    btn.textContent = isDirty ? "Save*" : "Save";
+    btn.classList.toggle("save-btn--dirty", isDirty);
+  }
   function persist() {
+    isDirty = true;
+    updateSaveIndicator();
+  }
+  function saveNow() {
     showToast("Saving…");
-    callApi("saveProject", { project: project }).then(function () { showToast("Saved"); }).catch(function (err) {
+    callApi("saveProject", { project: project }).then(function () {
+      isDirty = false;
+      updateSaveIndicator();
+      showToast("Saved");
+    }).catch(function (err) {
       showToast("Save failed: " + err.message);
+    });
+  }
+  function applyLoadedProject(p) {
+    project = p;
+    isDirty = false;
+    updateSaveIndicator();
+    var isEmpty = project.categories.length === 0 && project.lineItems.length === 0 &&
+      project.draws.length === 0 && project.capTable.length === 0;
+    if (isEmpty) renderEmptyState();
+    else render();
+  }
+  function loadNow() {
+    if (isDirty && !window.confirm("You have unsaved changes. Loading will discard them. Continue?")) return;
+    showToast("Loading…");
+    callApi("getProject").then(function (p) {
+      applyLoadedProject(p);
+      showToast("Loaded");
+    }).catch(function (err) {
+      showToast("Load failed: " + err.message);
     });
   }
 
   function boot() {
     callApi("getProject").then(function (p) {
-      project = p;
-      var isEmpty = project.categories.length === 0 && project.lineItems.length === 0 &&
-        project.draws.length === 0 && project.capTable.length === 0;
-      if (isEmpty) renderEmptyState();
-      else render();
+      applyLoadedProject(p);
     }).catch(function (err) {
       document.getElementById("bootMessage").textContent = "Failed to load: " + err.message;
     });
@@ -865,17 +904,12 @@
 
   // ---------- print layout ----------
   var PAGE_SIZES_IN = { letter: [8.5, 11], a4: [8.27, 11.69], legal: [8.5, 14], tabloid: [11, 17] };
-  var PRESET_MARGINS_IN = { narrow: 0.25, normal: 0.5, wide: 1 };
   var FONT_SCALE = { small: 0.85, normal: 1, large: 1.2 };
   var ROW_PADDING_PX = { compact: 2, normal: 5, spacious: 9 };
   var printZoom = 100;
 
   function marginsIn(settings) {
-    if (settings.margin === "custom") {
-      return { top: settings.marginTopIn, right: settings.marginRightIn, bottom: settings.marginBottomIn, left: settings.marginLeftIn };
-    }
-    var v = PRESET_MARGINS_IN[settings.margin];
-    return { top: v, right: v, bottom: v, left: v };
+    return { top: settings.marginTopIn, right: settings.marginRightIn, bottom: settings.marginBottomIn, left: settings.marginLeftIn };
   }
   function pageDimensionsPx(settings) {
     var dims = PAGE_SIZES_IN[settings.pageSize].slice();
@@ -930,8 +964,8 @@
 
     var pagesWrap = document.createElement("div");
     pagesWrap.className = "print-pages__pages";
-    pagesWrap.style.zoom = printZoom / 100;
     container.appendChild(pagesWrap);
+    var zoomFactor = printZoom / 100;
 
     var measureClone = sourceEl.cloneNode(true);
     stripIds(measureClone);
@@ -970,10 +1004,17 @@
     hint.textContent = numPages + " page" + (numPages > 1 ? "s" : "") + " at this page size — approximate; printed table headers repeat on every page automatically.";
 
     for (var i = 0; i < numPages; i++) {
+      var pageOuter = document.createElement("div");
+      pageOuter.className = "print-page-outer";
+      pageOuter.style.width = (dims.pageWidthPx * zoomFactor) + "px";
+      pageOuter.style.height = (dims.pageHeightPx * zoomFactor) + "px";
+
       var pageDiv = document.createElement("div");
       pageDiv.className = "print-page";
       pageDiv.style.width = dims.pageWidthPx + "px";
       pageDiv.style.height = dims.pageHeightPx + "px";
+      pageDiv.style.transform = "scale(" + zoomFactor + ")";
+      pageDiv.style.transformOrigin = "top left";
 
       var viewport = document.createElement("div");
       viewport.className = "print-page__viewport";
@@ -1008,7 +1049,8 @@
       label.textContent = "Page " + (i + 1) + " of " + numPages;
       pageDiv.appendChild(label);
 
-      pagesWrap.appendChild(pageDiv);
+      pageOuter.appendChild(pageDiv);
+      pagesWrap.appendChild(pageOuter);
     }
 
     toolbar.querySelector("#ppZoomOut").addEventListener("click", function () {
@@ -1275,7 +1317,7 @@
 
   function renderTabs() {
     var tabs = [
-      ["cashflow", "Cashflow"], ["summary", "Summary"], ["line-items", "Line Items"],
+      ["summary", "Summary"], ["cashflow", "Cashflow"], ["line-items", "Line Items"],
       ["draws", "Draws"], ["cap-table", "Cap Table"],
     ];
     document.getElementById("tabs").innerHTML = tabs.map(function (t) {
@@ -1400,20 +1442,28 @@
     var collapse = forcePrint ? { drawsList: false } : summarySectionCollapsed;
     var wrap = document.createElement("div");
     wrap.className = "section";
-    var html = "";
-
-    if (summary.draws.length) {
-      html += summarySectionHeader("drawsList", "Draws", collapse, forcePrint);
-      if (!collapse.drawsList) {
-        html += '<table class="mini-table"><tbody>';
-        summary.draws.forEach(function (d) { html += "<tr><td>" + esc(d.name) + "</td><td>" + esc(d.date) + "</td><td>" + fmtMoney(d.amount, true) + "</td><td>" + esc(d.source || "") + "</td></tr>"; });
-        html += "</tbody></table>";
-      }
-    }
-    wrap.innerHTML = html;
 
     var annualDrawWrap = buildAnnualDrawSummary(summary, forcePrint);
     if (annualDrawWrap) wrap.appendChild(annualDrawWrap);
+
+    if (summary.draws.length) {
+      var sortedDraws = summary.draws.slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
+      var drawsHtml = summarySectionHeader("drawsList", "Draws", collapse, forcePrint);
+      if (!collapse.drawsList) {
+        drawsHtml += '<table class="mini-table"><thead><tr><th>Draw</th><th>Date</th><th class="col-money">Amount</th><th>Source</th><th>Period</th><th class="col-money">Period Total</th></tr></thead><tbody>';
+        sortedDraws.forEach(function (d) {
+          var periodMonths = drawPeriodMonths(summary.months, sortedDraws, d.id);
+          var periodLabel = periodMonths.length ? (fmtMonth(periodMonths[0]) + " – " + fmtMonth(periodMonths[periodMonths.length - 1])) : "—";
+          var periodTotal = periodMonths.reduce(function (a, m) { return a + (summary.grandTotal.monthly[m] || 0); }, 0);
+          drawsHtml += "<tr><td>" + esc(d.name) + "</td><td>" + esc(d.date) + "</td><td class=\"col-money\">" + fmtMoney(d.amount, true) + "</td><td>" + esc(d.source || "") + "</td><td>" + periodLabel + "</td><td class=\"col-money\">" + fmtMoney(periodTotal) + "</td></tr>";
+        });
+        drawsHtml += "</tbody></table>";
+      }
+      var drawsDiv = document.createElement("div");
+      drawsDiv.className = "section";
+      drawsDiv.innerHTML = drawsHtml;
+      wrap.appendChild(drawsDiv);
+    }
 
     if (!forcePrint) {
       wrap.querySelectorAll("[data-summary-collapse]").forEach(function (btn) {
@@ -2049,7 +2099,26 @@
     panel.style.display = "flex";
   });
 
+  // ---------- hamburger menu ----------
+  document.getElementById("hamburgerBtn").addEventListener("click", function () {
+    var panel = document.getElementById("hamburgerPanel");
+    panel.style.display = panel.style.display === "none" ? "flex" : "none";
+  });
+
+  // ---------- save / load ----------
+  document.getElementById("saveBtn").addEventListener("click", function () { saveNow(); });
+  document.getElementById("loadBtn").addEventListener("click", function () { loadNow(); });
+  window.addEventListener("beforeunload", function (e) {
+    if (!isDirty) return;
+    e.preventDefault();
+    e.returnValue = "";
+  });
+
   // ---------- print ----------
+  var printGeneratedAt = null;
+  function cssContentString(s) {
+    return '"' + String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+  }
   function applyPrintSettingsToDom() {
     document.body.classList.toggle("print-grayscale", printSettings.colorMode === "grayscale");
     document.body.style.setProperty("--print-font-scale", String(FONT_SCALE[printSettings.fontSize]));
@@ -2060,10 +2129,16 @@
       styleEl.id = "dynamic-print-page";
       document.head.appendChild(styleEl);
     }
-    styleEl.textContent = "@page { size: " + pageCssSize(printSettings) + "; margin: " + marginCss(printSettings) + "; }";
+    var footerLeft = cssContentString((project ? project.name : "") + " — generated " + (printGeneratedAt ? printGeneratedAt.toLocaleString() : ""));
+    styleEl.textContent =
+      "@page { size: " + pageCssSize(printSettings) + "; margin: " + marginCss(printSettings) + ";" +
+      " @bottom-left { content: " + footerLeft + "; font-size: 8px; color: #666; }" +
+      ' @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 8px; color: #666; }' +
+      " }";
   }
   function setPreviewMode(on) {
     previewMode = on;
+    if (on) printGeneratedAt = new Date();
     document.body.classList.toggle("print-preview-mode", on);
     document.getElementById("printPreviewBar").style.display = on ? "flex" : "none";
     if (on) applyPrintSettingsToDom();
@@ -2085,12 +2160,6 @@
   });
   document.getElementById("ppOrientation").addEventListener("change", function (e) {
     printSettings.orientation = e.target.value;
-    applyPrintSettingsToDom();
-    render();
-  });
-  document.getElementById("ppMargin").addEventListener("change", function (e) {
-    printSettings.margin = e.target.value;
-    document.getElementById("ppCustomMargins").style.display = printSettings.margin === "custom" ? "contents" : "none";
     applyPrintSettingsToDom();
     render();
   });
