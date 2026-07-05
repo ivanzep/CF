@@ -1,20 +1,25 @@
 # Cashflow Tracker — Google Apps Script version
 
-A simpler alternative to the `frontend/` GitHub Pages app: a Google Sheet
-with a bound Apps Script that serves its own web app UI directly from
-`script.google.com`. No OAuth Client ID, no GitHub Pages, no build step —
-just paste three files into the Apps Script editor and deploy.
+A simpler alternative to the `frontend/`/`docs/` GitHub Pages apps: a script
+you attach to any Google Sheet you pick, that serves its own web app UI
+directly from `script.google.com`. **No Google Cloud Console, no OAuth
+Client ID, no GitHub Pages, no build step** — just paste three files into
+the Apps Script editor of a spreadsheet and deploy. The only permission
+prompt is the standard "This app wants to access your Google Sheets" screen
+you get when you deploy, same as any other Apps Script project.
 
-The sheet itself holds all the data (same tabs as the other version:
-`Project`, `Categories`, `LineItems`, `Payments`, `Draws`, `CapTable`,
-`Contributions`, `Distributions`), created automatically the first time the
-script runs.
+The spreadsheet holds all the data (tabs: `Project`, `Categories`,
+`LineItems`, `Payments`, `Draws`, `CapTable`, `Contributions`,
+`Distributions`), created automatically the first time the script runs —
+they're added alongside whatever else is already in the sheet, so this
+works equally well on a brand-new sheet or one you already use.
 
 ## Setup (about 3 minutes)
 
-1. **Create a blank Google Sheet.** Go to [sheets.new](https://sheets.new)
-   and give it a name, e.g. "Cashflow Tracker Data".
-2. **Open the script editor.** In the sheet, go to
+1. **Open the spreadsheet you want to use.** Any Google Sheet works — a
+   brand-new one from [sheets.new](https://sheets.new), or one you already
+   have. This is the sheet the script will bind to and store data in.
+2. **Open the script editor.** In that sheet, go to
    **Extensions → Apps Script**.
 3. **Add the three files from this folder:**
    - Delete the default `Code.gs` content and replace it with this repo's
