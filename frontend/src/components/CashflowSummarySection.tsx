@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useLayoutEffect, useRef, useState } from "react";
 import type { Summary } from "../types";
 import { fmtMoney, fmtMonth } from "../lib/format";
 import { CashflowChart } from "./CashflowChart";
@@ -8,6 +8,13 @@ interface Props {
 }
 
 export function CashflowSummarySection({ summary }: Props) {
+  const labelRef = useRef<HTMLTableCellElement>(null);
+  const [budgetLeft, setBudgetLeft] = useState(260);
+
+  useLayoutEffect(() => {
+    if (labelRef.current) setBudgetLeft(labelRef.current.offsetWidth);
+  }, [summary]);
+
   if (summary.months.length === 0) {
     return (
       <div className="section">
@@ -22,12 +29,14 @@ export function CashflowSummarySection({ summary }: Props) {
     <div className="section">
       <CashflowChart months={summary.months} monthly={summary.grandTotal.monthly} />
 
-      <div className="summary-grid-wrap">
+      <div className="summary-grid-wrap" style={{ ["--budget-col-left" as string]: `${budgetLeft}px` }}>
         <table className="summary-grid">
           <thead>
             <tr>
-              <th className="summary-grid__label">Line item</th>
-              <th className="col-money">Budget</th>
+              <th className="summary-grid__label" ref={labelRef}>
+                Line item
+              </th>
+              <th className="col-money summary-grid__budget">Budget</th>
               {summary.months.map((m) => (
                 <th key={m} className="col-money">
                   {fmtMonth(m)}
@@ -40,7 +49,7 @@ export function CashflowSummarySection({ summary }: Props) {
               <Fragment key={cat.id ?? "uncat"}>
                 <tr className="summary-grid__category">
                   <td className="summary-grid__label">{cat.name}</td>
-                  <td className="col-money"></td>
+                  <td className="col-money summary-grid__budget"></td>
                   {summary.months.map((m) => (
                     <td key={m} className="col-money"></td>
                   ))}
@@ -51,7 +60,7 @@ export function CashflowSummarySection({ summary }: Props) {
                       {li.code && <span className="summary-grid__code">{li.code}</span>}
                       {li.description}
                     </td>
-                    <td className="col-money">{fmtMoney(li.totalBudget)}</td>
+                    <td className="col-money summary-grid__budget">{fmtMoney(li.totalBudget)}</td>
                     {summary.months.map((m) => (
                       <td key={m} className="col-money">
                         {li.monthly[m] ? fmtMoney(li.monthly[m]) : ""}
@@ -61,7 +70,7 @@ export function CashflowSummarySection({ summary }: Props) {
                 ))}
                 <tr className="summary-grid__subtotal">
                   <td className="summary-grid__label">Total {cat.name}</td>
-                  <td className="col-money">{fmtMoney(cat.subtotalTotal)}</td>
+                  <td className="col-money summary-grid__budget">{fmtMoney(cat.subtotalTotal)}</td>
                   {summary.months.map((m) => (
                     <td key={m} className="col-money">
                       {cat.subtotal[m] ? fmtMoney(cat.subtotal[m]) : ""}
@@ -72,7 +81,7 @@ export function CashflowSummarySection({ summary }: Props) {
             ))}
             <tr className="summary-grid__grandtotal">
               <td className="summary-grid__label">Grand Total</td>
-              <td className="col-money">{fmtMoney(summary.grandTotal.total)}</td>
+              <td className="col-money summary-grid__budget">{fmtMoney(summary.grandTotal.total)}</td>
               {summary.months.map((m) => (
                 <td key={m} className="col-money">
                   {summary.grandTotal.monthly[m] ? fmtMoney(summary.grandTotal.monthly[m]) : ""}

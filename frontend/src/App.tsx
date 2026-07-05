@@ -90,6 +90,9 @@ function App() {
           + new project
         </button>
         {busy && <span className="app-topbar__busy">{busy}</span>}
+        <button className="link-button" onClick={() => window.print()}>
+          Print
+        </button>
       </header>
 
       {projectLoading || !project ? (

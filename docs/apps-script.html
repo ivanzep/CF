@@ -173,11 +173,13 @@
   .summary-grid-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
   .summary-grid { font-size: 12.5px; }
   .summary-grid th, .summary-grid td { padding: 5px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  .summary-grid th { position: sticky; top: 0; background: var(--surface); color: var(--text-muted); font-weight: 500; text-align: right; }
-  .summary-grid__label { text-align: left !important; position: sticky; left: 0; background: var(--surface); min-width: 260px; }
+  .summary-grid th { position: sticky; top: 0; background: var(--surface); color: var(--text-muted); font-weight: 500; text-align: right; z-index: 2; }
+  .summary-grid__label { text-align: left !important; position: sticky; left: 0; background: var(--surface); min-width: 260px; z-index: 1; }
+  .summary-grid__budget { position: sticky; left: var(--budget-col-left, 260px); background: var(--surface); box-shadow: 2px 0 4px -2px rgba(0,0,0,0.15); z-index: 1; }
+  .summary-grid th.summary-grid__label, .summary-grid th.summary-grid__budget { z-index: 3; }
   .summary-grid__code { color: var(--text-muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
   .summary-grid__category td { font-weight: 600; background: var(--page); }
-  .summary-grid__category td.summary-grid__label { background: var(--page); }
+  .summary-grid__category td.summary-grid__label, .summary-grid__category td.summary-grid__budget { background: var(--page); }
   .summary-grid__subtotal td { font-weight: 600; border-top: 1px solid var(--border-strong); }
   .summary-grid__grandtotal td { font-weight: 700; border-top: 2px solid var(--border-strong); font-size: 13.5px; }
 
@@ -218,6 +220,17 @@
   .setup-gate__field input { font-size: 12.5px; }
   .setup-gate__error { color: var(--danger) !important; }
   .signed-in-bar { display: flex; align-items: center; gap: 12px; justify-content: center; padding: 6px 24px; font-size: 11.5px; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+
+  @media print {
+    @page { size: landscape; margin: 12mm; }
+    body { background: #fff; }
+    button, select, .tabs, .app-topbar, .signed-in-bar { display: none !important; }
+    .app, .section { max-width: none; }
+    .summary-grid-wrap { overflow: visible !important; border: none; }
+    .summary-grid th, .summary-grid__label, .summary-grid__budget { position: static !important; box-shadow: none !important; }
+    .cashflow-chart, .summary-grid-wrap, .draws-summary { border: none; box-shadow: none; }
+    tr { page-break-inside: avoid; }
+  }
 </style>
 </head>
 <body>
@@ -233,6 +246,7 @@
   <header class="app-topbar">
     <span class="app-topbar__title">Cashflow Tracker</span>
     <div class="app-topbar__spacer"></div>
+    <button class="link-button" id="printBtn" type="button">Print</button>
     <button class="theme-toggle" id="themeToggle" type="button">◐ Toggle theme</button>
   </header>
   <div id="bootMessage" class="section__intro" style="padding: 0 0 16px;">Loading your data…</div>
@@ -669,24 +683,24 @@
 
     var gridWrap = document.createElement("div");
     gridWrap.className = "summary-grid-wrap";
-    var html = '<table class="summary-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money">Budget</th>';
+    var html = '<table class="summary-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money summary-grid__budget">Budget</th>';
     summary.months.forEach(function (m) { html += '<th class="col-money">' + fmtMonth(m) + "</th>"; });
     html += "</tr></thead><tbody>";
     summary.categories.forEach(function (cat) {
-      html += '<tr class="summary-grid__category"><td class="summary-grid__label">' + esc(cat.name) + "</td><td></td>";
+      html += '<tr class="summary-grid__category"><td class="summary-grid__label">' + esc(cat.name) + '</td><td class="summary-grid__budget"></td>';
       summary.months.forEach(function () { html += "<td></td>"; });
       html += "</tr>";
       cat.lineItems.forEach(function (li) {
         html += '<tr><td class="summary-grid__label">' + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
-        html += '<td class="col-money">' + fmtMoney(li.totalBudget) + "</td>";
+        html += '<td class="col-money summary-grid__budget">' + fmtMoney(li.totalBudget) + "</td>";
         summary.months.forEach(function (m) { html += '<td class="col-money">' + (li.monthly[m] ? fmtMoney(li.monthly[m]) : "") + "</td>"; });
         html += "</tr>";
       });
-      html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money\">" + fmtMoney(cat.subtotalTotal) + "</td>";
+      html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money summary-grid__budget\">" + fmtMoney(cat.subtotalTotal) + "</td>";
       summary.months.forEach(function (m) { html += '<td class="col-money">' + (cat.subtotal[m] ? fmtMoney(cat.subtotal[m]) : "") + "</td>"; });
       html += "</tr>";
     });
-    html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money">' + fmtMoney(summary.grandTotal.total) + "</td>";
+    html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money summary-grid__budget">' + fmtMoney(summary.grandTotal.total) + "</td>";
     summary.months.forEach(function (m) { html += '<td class="col-money">' + (summary.grandTotal.monthly[m] ? fmtMoney(summary.grandTotal.monthly[m]) : "") + "</td>"; });
     html += "</tr></tbody></table>";
     gridWrap.innerHTML = html;
@@ -703,6 +717,8 @@
     }
 
     el.appendChild(wrap);
+    var labelCell = gridWrap.querySelector(".summary-grid__label");
+    if (labelCell) gridWrap.style.setProperty("--budget-col-left", labelCell.offsetWidth + "px");
     document.getElementById("chartCollapseBtn").addEventListener("click", function () {
       chartCollapsed = !chartCollapsed;
       render();
@@ -1185,6 +1201,11 @@
     var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     var effectiveIsDark = current ? current === "dark" : prefersDark;
     root.setAttribute("data-theme", effectiveIsDark ? "light" : "dark");
+  });
+
+  // ---------- print ----------
+  document.getElementById("printBtn").addEventListener("click", function () {
+    window.print();
   });
 
   if (getApiUrl()) {
