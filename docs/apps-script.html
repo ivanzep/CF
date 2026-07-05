@@ -275,30 +275,98 @@
   function setApiToken(token) { localStorage.setItem(API_TOKEN_KEY, token.trim()); }
   function clearApiUrl() { localStorage.removeItem(API_URL_KEY); localStorage.removeItem(API_TOKEN_KEY); }
 
+  // Apps Script web app responses carry no CORS headers, so fetch()/XHR
+  // reading the response gets blocked by the browser even though the
+  // request executes fine server-side. Neither JSONP (<script> tag) nor a
+  // <form>-to-hidden-<iframe> submission are subject to CORS at all, so we
+  // use those instead of fetch for every call.
+  var __jsonpCounter = 0;
+  function jsonpRequest_(url) {
+    return new Promise(function (resolve, reject) {
+      var cbName = "cf_jsonp_cb_" + Date.now() + "_" + (++__jsonpCounter);
+      var script = document.createElement("script");
+      var timeout = setTimeout(function () {
+        cleanup();
+        reject(new Error("Request to Apps Script backend timed out"));
+      }, 20000);
+      function cleanup() {
+        clearTimeout(timeout);
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+      }
+      window[cbName] = function (data) {
+        cleanup();
+        resolve(data);
+      };
+      script.onerror = function () {
+        cleanup();
+        reject(new Error("Could not reach the Apps Script backend (check the URL and that the deployment access is \"Anyone\")"));
+      };
+      script.src = url + (url.indexOf("?") === -1 ? "?" : "&") + "callback=" + cbName;
+      document.body.appendChild(script);
+    });
+  }
+
+  var __formPostCounter = 0;
+  function formPostRequest_(url, fields) {
+    return new Promise(function (resolve) {
+      var suffix = Date.now() + "_" + (++__formPostCounter);
+      var iframe = document.createElement("iframe");
+      iframe.name = "cf_form_target_" + suffix;
+      iframe.style.display = "none";
+      document.body.appendChild(iframe);
+
+      var form = document.createElement("form");
+      form.method = "POST";
+      form.action = url;
+      form.target = iframe.name;
+      Object.keys(fields).forEach(function (key) {
+        var input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = fields[key] == null ? "" : fields[key];
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+
+      // We can't read the (cross-origin) iframe's response, so this resolves
+      // optimistically once the browser reports the submission completed.
+      // Reload the page (or just wait for the next getProject) to confirm.
+      iframe.addEventListener("load", function () {
+        setTimeout(function () {
+          if (form.parentNode) form.parentNode.removeChild(form);
+          if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        }, 1000);
+        resolve({ ok: true });
+      });
+      form.submit();
+    });
+  }
+
+  function throwIfApiError_(json) {
+    if (json && json.error) throw new Error(json.error);
+    return json;
+  }
+
   function callApi(action, payload) {
     var url = getApiUrl();
     if (!url) return Promise.reject(new Error("No Apps Script Web App URL configured"));
     var token = getApiToken();
 
-    if (action === "getProject") {
-      var getUrl = url + (url.indexOf("?") === -1 ? "?" : "&") + "action=getProject" + (token ? "&token=" + encodeURIComponent(token) : "");
-      return fetch(getUrl).then(handleApiResponse_);
+    if (action === "getProject" || action === "loadExampleData") {
+      var getUrl = url + (url.indexOf("?") === -1 ? "?" : "&") + "action=" + action + (token ? "&token=" + encodeURIComponent(token) : "");
+      return jsonpRequest_(getUrl).then(throwIfApiError_);
     }
 
-    var body = Object.assign({ action: action, token: token }, payload || {});
-    return fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" }, // avoids a CORS preflight the Apps Script endpoint can't answer
-      body: JSON.stringify(body),
-    }).then(handleApiResponse_);
-  }
+    if (action === "saveProject") {
+      return formPostRequest_(url, {
+        action: "saveProject",
+        token: token,
+        project: JSON.stringify(payload.project),
+      });
+    }
 
-  function handleApiResponse_(res) {
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    return res.json().then(function (json) {
-      if (json && json.error) throw new Error(json.error);
-      return json;
-    });
+    return Promise.reject(new Error("Unknown action: " + action));
   }
 
   function persist() {

@@ -44,6 +44,19 @@ brand-new sheet or one you already use.
    [docs README](../docs/README.md)), paste the URL into **Connect your
    Apps Script backend**, and click **Connect**.
 
+## If you already set this up before this note was added
+
+`Code.gs` changed to work around a real limitation: Google Apps Script web
+app responses don't carry CORS headers, so a browser calling this API with
+`fetch()` from a different origin gets a network-level error ("Load
+failed" / "Failed to fetch") even though the request executes fine
+server-side. `Code.gs` and `docs/apps-script.html` now talk to each other
+using two techniques that are exempt from CORS entirely — a `<script>` tag
+(JSONP) for reads, a hidden `<form>`/`<iframe>` submission for writes — so
+if you deployed an earlier version, **copy the current `Code.gs` into the
+Apps Script editor again and redeploy** (Deploy → Manage deployments →
+Edit → New version → Deploy). The `/exec` URL stays the same.
+
 ## Using it
 
 On first connect there's no data yet — click **Load La Costa Hotel

@@ -7,9 +7,24 @@
  * in docs/apps-script.html (hosted separately, e.g. on GitHub Pages). All
  * data lives in tabs on the bound spreadsheet.
  *
- * Endpoints (both accept an "action" — see handleAction_ for the list):
- *   GET  {url}?action=getProject
- *   POST {url}  body: {"action": "saveProject", "project": {...}}
+ * Apps Script web app responses don't carry CORS headers, so a visiting
+ * page's fetch()/XHR calls to this URL get blocked reading the response
+ * even though the server executes fine ("Load failed" / "Failed to
+ * fetch"). To work around that without any header control on our side,
+ * this API is designed to be called two CORS-exempt ways instead:
+ *
+ *   - Reads (GET, action=getProject|loadExampleData): called via a
+ *     dynamic <script> tag (JSONP). Pass &callback=NAME and the response
+ *     is NAME(<json>) as JavaScript, instead of bare JSON.
+ *   - Writes (POST, action=saveProject): called via a hidden
+ *     <form target="hidden-iframe"> submission, which is also exempt
+ *     from CORS. Fields arrive in e.parameter same as a GET's query
+ *     string; "project" is a JSON string field, parsed server-side.
+ *
+ * Calling either endpoint directly with plain JSON (no callback, a
+ * same-origin fetch, or Postman/curl) still works exactly as a normal
+ * JSON API — the callback wrapping only kicks in when ?callback=... is
+ * present.
  *
  * Optional protection: set a Script Property named API_TOKEN (Project
  * Settings > Script Properties) and every request must then include a
@@ -43,35 +58,61 @@ var DATE_COLUMNS = {
 function doGet(e) {
   ensureSheetsExist_();
   var params = (e && e.parameter) || {};
-  return handleAction_(params.action || "getProject", params);
+  var result = computeAction_(params.action || "getProject", params);
+  if (params.callback) {
+    return ContentService
+      .createTextOutput(params.callback + "(" + JSON.stringify(result) + ")")
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return jsonOutput_(result);
 }
 
 function doPost(e) {
   ensureSheetsExist_();
-  var body;
-  try {
-    body = JSON.parse((e && e.postData && e.postData.contents) || "{}");
-  } catch (err) {
-    return jsonOutput_({ error: "Invalid JSON body" });
+  var payload;
+  if (e && e.postData && e.postData.type === "application/json") {
+    // Plain JSON POST (same-origin fetch, curl, Postman, etc).
+    try {
+      payload = JSON.parse(e.postData.contents || "{}");
+    } catch (err) {
+      return jsonOutput_({ error: "Invalid JSON body" });
+    }
+  } else {
+    // Hidden-form submission: fields arrive as e.parameter, "project" as a JSON string.
+    payload = Object.assign({}, (e && e.parameter) || {});
+    if (typeof payload.project === "string") {
+      try {
+        payload.project = JSON.parse(payload.project);
+      } catch (err) {
+        return jsonOutput_({ error: "Invalid project JSON" });
+      }
+    }
   }
-  return handleAction_(body.action, body);
+  var result = computeAction_(payload.action, payload);
+  if (payload.callback) {
+    return ContentService
+      .createTextOutput(payload.callback + "(" + JSON.stringify(result) + ")")
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return jsonOutput_(result);
 }
 
-function handleAction_(action, payload) {
+/** Runs the requested action and returns a plain result object (never wraps it — callers decide JSON vs JSONP). */
+function computeAction_(action, payload) {
   payload = payload || {};
   if (!checkToken_(payload)) {
-    return jsonOutput_({ error: "Unauthorized: missing or incorrect token" });
+    return { error: "Unauthorized: missing or incorrect token" };
   }
   try {
-    if (action === "getProject") return jsonOutput_(getProject());
+    if (action === "getProject") return getProject();
     if (action === "saveProject") {
       saveProject(payload.project);
-      return jsonOutput_({ ok: true });
+      return { ok: true };
     }
-    if (action === "loadExampleData") return jsonOutput_(loadExampleData());
-    return jsonOutput_({ error: "Unknown action: " + action });
+    if (action === "loadExampleData") return loadExampleData();
+    return { error: "Unknown action: " + action };
   } catch (err) {
-    return jsonOutput_({ error: String((err && err.message) || err) });
+    return { error: String((err && err.message) || err) };
   }
 }
 
