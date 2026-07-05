@@ -122,6 +122,8 @@
   }
   .project-header--collapsed { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; }
   .project-header__collapsed-name { font-size: 16px; font-weight: 600; }
+  .project-header__collapsed-left { display: flex; flex-direction: column; }
+  .project-header__brand { display: block; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 2px; }
   .project-header__top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
   .project-header__name { font-size: 22px; font-weight: 700; margin-bottom: 0; width: auto; flex: 1; }
   .project-header__meta { display: flex; gap: 32px; flex-wrap: wrap; font-size: 12px; color: var(--text-muted); }
@@ -257,22 +259,7 @@
   .setup-gate__error { color: var(--danger) !important; }
   .signed-in-bar { display: flex; align-items: center; gap: 12px; justify-content: center; padding: 6px 24px; font-size: 11.5px; color: var(--text-muted); border-bottom: 1px solid var(--border); }
 
-  @media print {
-    @page { size: landscape; margin: 12mm; }
-    body { background: #fff; font-size: calc(1em * var(--print-font-scale, 1)); }
-    body.print-grayscale { filter: grayscale(1); }
-    button, select, .tabs, .app-topbar, .signed-in-bar { display: none !important; }
-    .app, .section { max-width: none; }
-    .summary-grid-wrap { overflow: visible !important; max-height: none !important; border: none; }
-    .summary-grid th, .summary-grid__label, .summary-grid__budget { position: static !important; box-shadow: none !important; }
-    .summary-grid th, .summary-grid td { padding-top: var(--print-row-padding, 5px); padding-bottom: var(--print-row-padding, 5px); }
-    .cashflow-chart, .summary-grid-wrap, .draws-summary { border: none; box-shadow: none; }
-    tr { page-break-inside: avoid; }
-    .print-pages, .print-preview-bar { display: none !important; }
-    .print-preview-mode .print-real-content { display: block !important; }
-  }
-
-  /* On-screen print preview (mirrors the @media print rules above, live) */
+  /* On-screen print preview (mirrors the @media print rules below, live) */
   .print-preview-bar { position: sticky; top: 0; z-index: 100; display: flex; flex-direction: column; gap: 8px; background: var(--accent); color: #fff; padding: 10px 24px; }
   .print-preview-bar__row { display: flex; align-items: center; gap: 12px; }
   .print-preview-bar__settings { flex-wrap: wrap; font-size: 11px; }
@@ -294,6 +281,42 @@
   .print-preview-mode .cashflow-chart, .print-preview-mode .summary-grid-wrap, .print-preview-mode .draws-summary { border: none; box-shadow: none; }
   .print-preview-mode tr { page-break-inside: avoid; }
   .print-preview-mode .print-real-content { display: none !important; }
+  .print-preview-mode .summary-grid { font-size: calc(12.5px * var(--print-font-scale, 1)); }
+  .print-preview-mode .summary-grid__monthnum { font-size: calc(9.5px * var(--print-font-scale, 1)); }
+  .print-preview-mode .summary-grid__grandtotal td { font-size: calc(13.5px * var(--print-font-scale, 1)); }
+  .print-preview-mode .summary-grid__notenote { font-size: calc(11px * var(--print-font-scale, 1)); }
+  .print-preview-mode .cashflow-chart h3 { font-size: calc(14px * var(--print-font-scale, 1)); }
+  .print-preview-mode .mini-table { font-size: calc(13px * var(--print-font-scale, 1)); }
+  .print-preview-mode .mini-table th { font-size: calc(11px * var(--print-font-scale, 1)); }
+  .print-preview-mode .summary-section-header h2 { font-size: calc(17px * var(--print-font-scale, 1)); }
+  .print-preview-mode .annual-draw-summary__draw-header label, .print-preview-mode .annual-draw-summary__period { font-size: calc(12px * var(--print-font-scale, 1)); }
+  .print-preview-mode .cap-table-summary th { font-size: calc(11px * var(--print-font-scale, 1)); }
+
+  @media print {
+    @page { size: landscape; margin: 12mm; }
+    body { background: #fff; font-size: calc(1em * var(--print-font-scale, 1)); }
+    body.print-grayscale { filter: grayscale(1); }
+    button, select, .tabs, .app-topbar, .signed-in-bar { display: none !important; }
+    .app, .section { max-width: none; }
+    .summary-grid-wrap { overflow: visible !important; max-height: none !important; border: none; }
+    .summary-grid th, .summary-grid__label, .summary-grid__budget { position: static !important; box-shadow: none !important; }
+    .summary-grid th, .summary-grid td { padding-top: var(--print-row-padding, 5px); padding-bottom: var(--print-row-padding, 5px); }
+    .cashflow-chart, .summary-grid-wrap, .draws-summary { border: none; box-shadow: none; }
+    tr { page-break-inside: avoid; }
+    .summary-section-header { break-before: page; }
+    .print-pages, .print-preview-bar { display: none !important; }
+    .print-preview-mode .print-real-content { display: block !important; }
+    .summary-grid { font-size: calc(12.5px * var(--print-font-scale, 1)); }
+    .summary-grid__monthnum { font-size: calc(9.5px * var(--print-font-scale, 1)); }
+    .summary-grid__grandtotal td { font-size: calc(13.5px * var(--print-font-scale, 1)); }
+    .summary-grid__notenote { font-size: calc(11px * var(--print-font-scale, 1)); }
+    .cashflow-chart h3 { font-size: calc(14px * var(--print-font-scale, 1)); }
+    .mini-table { font-size: calc(13px * var(--print-font-scale, 1)); }
+    .mini-table th { font-size: calc(11px * var(--print-font-scale, 1)); }
+    .summary-section-header h2 { font-size: calc(17px * var(--print-font-scale, 1)); }
+    .annual-draw-summary__draw-header label, .annual-draw-summary__period { font-size: calc(12px * var(--print-font-scale, 1)); }
+    .cap-table-summary th { font-size: calc(11px * var(--print-font-scale, 1)); }
+  }
 
   .print-pages { display: flex; flex-direction: column; gap: 12px; padding: 16px 0 48px; background: var(--page); }
   .print-pages__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 24px; }
@@ -411,6 +434,14 @@
         Repeat header row on every page
       </label>
     </div>
+    <div class="print-preview-bar__row print-preview-bar__sections">
+      <span class="print-preview-bar__label">Include sections</span>
+      <label class="print-preview-bar__checkbox"><input type="checkbox" id="psCashflow" checked /> Cashflow</label>
+      <label class="print-preview-bar__checkbox"><input type="checkbox" id="psYearly" checked /> Budget by Year</label>
+      <label class="print-preview-bar__checkbox"><input type="checkbox" id="psDrawReport" checked /> Draw Request</label>
+      <label class="print-preview-bar__checkbox"><input type="checkbox" id="psCapTable" checked /> Cap Table</label>
+      <label class="print-preview-bar__checkbox"><input type="checkbox" id="psDrawsList" checked /> Draws</label>
+    </div>
   </div>
   <div class="signed-in-bar">
     <span id="connectionLabel">Connected</span>
@@ -418,14 +449,13 @@
   </div>
 <div class="app">
   <header class="app-topbar">
-    <span class="app-topbar__title">Cashflow Tracker</span>
     <div class="app-topbar__spacer"></div>
-    <button class="link-button" id="loadBtn" type="button">Load</button>
-    <button class="link-button" id="saveBtn" type="button">Save</button>
-    <button class="link-button" id="printBtn" type="button">Print Preview</button>
     <div class="hamburger-menu" id="hamburgerWrap">
       <button class="link-button hamburger-menu__btn" id="hamburgerBtn" type="button" aria-label="More options">☰</button>
       <div class="hamburger-menu__panel" id="hamburgerPanel" style="display:none;">
+        <button class="link-button" id="loadBtn" type="button">Load</button>
+        <button class="link-button" id="saveBtn" type="button">Save</button>
+        <button class="link-button" id="printBtn" type="button">Print Preview</button>
         <div class="export-csv" id="exportCsvWrap">
           <button class="link-button" id="exportCsvBtn" type="button">Export CSV</button>
           <div class="export-csv__panel" id="exportCsvPanel" style="display:none;"></div>
@@ -470,6 +500,7 @@
     marginTopIn: 0.5, marginRightIn: 0.5, marginBottomIn: 0.5, marginLeftIn: 0.5,
     fontSize: "normal", rowSize: "normal", colorMode: "color", repeatHeader: true,
   };
+  var printSections = { cashflow: true, yearly: true, drawReport: true, capTable: true, drawsList: true };
   var nextIdCounter = 1;
 
   function genId(prefix) { return prefix + "_" + (nextIdCounter++) + "_" + Math.random().toString(36).slice(2, 7); }
@@ -588,9 +619,12 @@
   var isDirty = false;
   function updateSaveIndicator() {
     var btn = document.getElementById("saveBtn");
-    if (!btn) return;
-    btn.textContent = isDirty ? "Save*" : "Save";
-    btn.classList.toggle("save-btn--dirty", isDirty);
+    if (btn) {
+      btn.textContent = isDirty ? "Save*" : "Save";
+      btn.classList.toggle("save-btn--dirty", isDirty);
+    }
+    var hamburgerBtn = document.getElementById("hamburgerBtn");
+    if (hamburgerBtn) hamburgerBtn.classList.toggle("save-btn--dirty", isDirty);
   }
   function persist() {
     isDirty = true;
@@ -798,8 +832,9 @@
     h += "</div>";
     return h;
   }
-  function buildAnnualDrawSummary(summary, forcePrint) {
+  function buildAnnualDrawSummary(summary, forcePrint, sectionsFilter) {
     if (summary.months.length === 0) return null;
+    var include = sectionsFilter || { yearly: true, drawReport: true, capTable: true };
     var collapse = forcePrint ? { yearly: false, drawReport: false, capTable: false } : summarySectionCollapsed;
     var years = Array.from(new Set(summary.months.map(yearOf))).sort();
     var sortedDraws = summary.draws.slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
@@ -815,7 +850,9 @@
 
     var wrap = document.createElement("div");
     wrap.className = "section annual-draw-summary";
-    var html = summarySectionHeader("yearly", "Budget Totals by Year", collapse, forcePrint);
+    var html = "";
+    if (include.yearly) {
+    html += summarySectionHeader("yearly", "Budget Totals by Year", collapse, forcePrint);
     if (!collapse.yearly) {
       html += '<div class="summary-grid-wrap annual-grid-wrap"><table class="summary-grid annual-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money">Budget</th>';
       years.forEach(function (y) { html += '<th class="col-money">' + y + "</th>"; });
@@ -838,8 +875,9 @@
       years.forEach(function (y) { var t = yearTotal(summary.grandTotal.monthly, y); html += '<td class="col-money">' + (t ? fmtMoney(t) : "") + "</td>"; });
       html += "</tr></tbody></table></div>";
     }
+    }
 
-    if (sortedDraws.length > 0) {
+    if (include.drawReport && sortedDraws.length > 0) {
       html += summarySectionHeader("drawReport", "Draw Request Summary", collapse, forcePrint);
       if (!collapse.drawReport) {
         html += '<div class="annual-draw-summary__draw-header"><label>Draw<select id="drawSummarySelect">';
@@ -878,7 +916,7 @@
       }
     }
 
-    if (summary.capTable.length > 0) {
+    if (include.capTable && summary.capTable.length > 0) {
       html += summarySectionHeader("capTable", "Cap Table Summary", collapse, forcePrint);
       if (!collapse.capTable) {
         html += '<table class="mini-table cap-table-summary"><thead><tr><th>Member</th><th>Role</th><th class="col-money">Ownership %</th><th class="col-money">Contributed</th><th class="col-money">Distributed</th><th class="col-money">Net Position</th></tr></thead><tbody>';
@@ -891,6 +929,7 @@
       }
     }
 
+    if (!html) return null;
     wrap.innerHTML = html;
     var select = wrap.querySelector("#drawSummarySelect");
     if (select) {
@@ -976,6 +1015,10 @@
     document.body.appendChild(measureClone);
     var totalHeight = measureClone.scrollHeight;
 
+    var sectionMarkers = Array.from(measureClone.querySelectorAll(".cashflow-chart, .summary-section-header"))
+      .map(function (el) { return el.offsetTop; })
+      .sort(function (a, b) { return a - b; });
+
     var headerHeight = 0, headerCloneHtml = null, mainGridBottom = Infinity;
     if (settings.repeatHeader) {
       var table = measureClone.querySelector(".summary-grid");
@@ -997,9 +1040,21 @@
 
     var page1Capacity = dims.contentHeightPx;
     var laterCapacity = settings.repeatHeader ? Math.max(50, dims.contentHeightPx - headerHeight) : dims.contentHeightPx;
-    var remaining = Math.max(0, totalHeight - page1Capacity);
-    var numPages = totalHeight <= page1Capacity ? 1 : 1 + Math.ceil(remaining / laterCapacity);
-    function shiftForPage(i) { return i === 0 ? 0 : page1Capacity + (i - 1) * laterCapacity; }
+
+    var pageBounds = [];
+    var cursor = 0;
+    while (cursor < totalHeight) {
+      var capacity = pageBounds.length === 0 ? page1Capacity : laterCapacity;
+      var naiveEnd = cursor + capacity;
+      var nextMarker = sectionMarkers.filter(function (m) { return m > cursor && m < naiveEnd; })[0];
+      var pageEnd = nextMarker !== undefined ? nextMarker : naiveEnd;
+      if (pageEnd <= cursor) pageEnd = naiveEnd;
+      pageBounds.push(Math.min(pageEnd, totalHeight));
+      cursor = pageEnd;
+    }
+    if (pageBounds.length === 0) pageBounds.push(totalHeight);
+    var numPages = pageBounds.length;
+    function shiftForPage(i) { return i === 0 ? 0 : pageBounds[i - 1]; }
 
     hint.textContent = numPages + " page" + (numPages > 1 ? "s" : "") + " at this page size — approximate; printed table headers repeat on every page automatically.";
 
@@ -1272,7 +1327,10 @@
     if (projectHeaderCollapsed) {
       el.className = "project-header project-header--collapsed";
       el.innerHTML =
-        '<span class="project-header__collapsed-name">' + esc(project.name || "Untitled project") + "</span>" +
+        '<span class="project-header__collapsed-left">' +
+          '<span class="project-header__brand">Cashflow Tracker</span>' +
+          '<span class="project-header__collapsed-name">' + esc(project.name || "Untitled project") + "</span>" +
+        "</span>" +
         '<button class="link-button" id="projectHeaderExpandBtn">▸ expand</button>';
       document.getElementById("projectHeaderExpandBtn").addEventListener("click", function () {
         projectHeaderCollapsed = false;
@@ -1282,6 +1340,7 @@
     }
     el.className = "project-header";
     el.innerHTML =
+      '<span class="project-header__brand">Cashflow Tracker</span>' +
       '<div class="project-header__top">' +
         '<input class="editable-text project-header__name" ' +
           'value="' + esc(project.name) + '" data-bind="project.name" />' +
@@ -1438,15 +1497,16 @@
   }
 
   // ---------- Summary (yearly totals + draw request + cap table) ----------
-  function buildSummarySection(summary, forcePrint) {
+  function buildSummarySection(summary, forcePrint, sectionsFilter) {
+    var include = sectionsFilter || { drawsList: true, yearly: true, drawReport: true, capTable: true };
     var collapse = forcePrint ? { drawsList: false } : summarySectionCollapsed;
     var wrap = document.createElement("div");
     wrap.className = "section";
 
-    var annualDrawWrap = buildAnnualDrawSummary(summary, forcePrint);
+    var annualDrawWrap = buildAnnualDrawSummary(summary, forcePrint, include);
     if (annualDrawWrap) wrap.appendChild(annualDrawWrap);
 
-    if (summary.draws.length) {
+    if (include.drawsList && summary.draws.length) {
       var sortedDraws = summary.draws.slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
       var drawsHtml = summarySectionHeader("drawsList", "Draws", collapse, forcePrint);
       if (!collapse.drawsList) {
@@ -1488,8 +1548,9 @@
     var summary = buildSummary(project);
     if (summary.months.length === 0) { el.appendChild(emptyScheduleSection()); return; }
     var wrap = document.createElement("div");
-    wrap.appendChild(buildCashflowSection(summary, true));
-    wrap.appendChild(buildSummarySection(summary, true));
+    if (printSections.cashflow) wrap.appendChild(buildCashflowSection(summary, true));
+    var summaryWrap = buildSummarySection(summary, true, printSections);
+    if (summaryWrap.children.length) wrap.appendChild(summaryWrap);
     var pages = buildPrintPages(wrap, printSettings);
     el.appendChild(pages);
     wrap.classList.add("print-real-content");
@@ -2186,6 +2247,12 @@
   document.getElementById("ppRepeatHeader").addEventListener("change", function (e) {
     printSettings.repeatHeader = e.target.checked;
     render();
+  });
+  [["psCashflow", "cashflow"], ["psYearly", "yearly"], ["psDrawReport", "drawReport"], ["psCapTable", "capTable"], ["psDrawsList", "drawsList"]].forEach(function (pair) {
+    document.getElementById(pair[0]).addEventListener("change", function (e) {
+      printSections[pair[1]] = e.target.checked;
+      render();
+    });
   });
   document.getElementById("ppFontSize").addEventListener("change", function (e) {
     printSettings.fontSize = e.target.value;
