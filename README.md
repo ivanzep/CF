@@ -20,17 +20,21 @@ Lets you:
 - View a computed **monthly cashflow summary** (spreadsheet-style grid, by
   category and line item) plus a chart of total monthly cashflow.
 
-There are two ways to run this tool — pick one:
+There are three ways to run this tool — pick one:
 
-| | `frontend/` (this doc) | [`apps-script/`](./apps-script/README.md) |
-|---|---|---|
-| Hosting | GitHub Pages | `script.google.com` (Google-hosted) |
-| Setup | Create an OAuth Client ID, enable GitHub Pages | Paste 3 files into the Apps Script editor |
-| Sign-in | Google sign-in per visitor | None — runs as whoever deployed it |
-| Best for | Sharing a URL with others who each use their own Google account | Fastest personal setup, or sharing one shared dataset |
+| | `frontend/` (this doc) | [`docs/`](./docs/README.md) | [`apps-script/`](./apps-script/README.md) |
+|---|---|---|---|
+| Hosting | GitHub Pages (via Actions build) | GitHub Pages (no build) | `script.google.com` (Google-hosted) |
+| Setup | Create an OAuth Client ID, enable GitHub Pages | Same OAuth Client ID, enable GitHub Pages (branch source) | Paste 3 files into the Apps Script editor |
+| Sign-in | Google sign-in per visitor | Google sign-in per visitor | None — runs as whoever deployed it |
+| Best for | The React codebase, if you want to keep developing it | Same experience with zero build step — one static file | Fastest personal setup, or sharing one shared dataset |
 
-The rest of this document covers the GitHub Pages version. See
-[`apps-script/README.md`](./apps-script/README.md) for the Apps Script setup.
+`frontend/` and `docs/` are the same app, built two different ways — a
+Pages site can only run one of them at a time (pick the source in repo
+Settings → Pages). The rest of this document covers the React/`frontend/`
+version. See [`docs/README.md`](./docs/README.md) for the single-file
+version, or [`apps-script/README.md`](./apps-script/README.md) for the
+Apps Script setup.
 
 ## Stack
 
