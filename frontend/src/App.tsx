@@ -5,10 +5,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ProjectHeader } from "./components/ProjectHeader";
 import { LineItemsSection } from "./components/LineItemsSection";
 import { CashflowSummarySection } from "./components/CashflowSummarySection";
+import { AnnualDrawSummarySection } from "./components/AnnualDrawSummarySection";
 import { DrawsSection } from "./components/DrawsSection";
 import { CapTableSection } from "./components/CapTableSection";
 import { PrintPages } from "./components/PrintPages";
 import { ExportCsvButton } from "./components/ExportCsvButton";
+import { ThemeButton } from "./components/ThemeButton";
 import {
   DEFAULT_PRINT_SETTINGS,
   FONT_SCALE,
@@ -157,6 +159,50 @@ function App() {
                 ))}
               </select>
             </label>
+            {printSettings.margin === "custom" && (
+              <>
+                <label>
+                  Top (in)
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={printSettings.marginTopIn}
+                    onChange={(e) => setPrintSettings({ ...printSettings, marginTopIn: Number(e.target.value) || 0 })}
+                  />
+                </label>
+                <label>
+                  Right (in)
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={printSettings.marginRightIn}
+                    onChange={(e) => setPrintSettings({ ...printSettings, marginRightIn: Number(e.target.value) || 0 })}
+                  />
+                </label>
+                <label>
+                  Bottom (in)
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={printSettings.marginBottomIn}
+                    onChange={(e) => setPrintSettings({ ...printSettings, marginBottomIn: Number(e.target.value) || 0 })}
+                  />
+                </label>
+                <label>
+                  Left (in)
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={printSettings.marginLeftIn}
+                    onChange={(e) => setPrintSettings({ ...printSettings, marginLeftIn: Number(e.target.value) || 0 })}
+                  />
+                </label>
+              </>
+            )}
             <label>
               Font size
               <select
@@ -195,6 +241,14 @@ function App() {
                 <option value="grayscale">Grayscale</option>
               </select>
             </label>
+            <label className="print-preview-bar__checkbox">
+              <input
+                type="checkbox"
+                checked={printSettings.repeatHeader}
+                onChange={(e) => setPrintSettings({ ...printSettings, repeatHeader: e.target.checked })}
+              />
+              Repeat header row on every page
+            </label>
           </div>
         </div>
       )}
@@ -218,6 +272,7 @@ function App() {
         <button className="link-button" onClick={() => setPreviewMode(true)}>
           Print Preview
         </button>
+        <ThemeButton />
       </header>
 
       {projectLoading || !project ? (
@@ -250,11 +305,13 @@ function App() {
             <>
               {previewMode && (
                 <PrintPages settings={printSettings}>
-                  <CashflowSummarySection summary={summary} />
+                  <CashflowSummarySection summary={summary} projectId={project.id} />
+                  <AnnualDrawSummarySection summary={summary} />
                 </PrintPages>
               )}
               <div className="print-real-content">
-                <CashflowSummarySection summary={summary} />
+                <CashflowSummarySection summary={summary} projectId={project.id} />
+                <AnnualDrawSummarySection summary={summary} />
               </div>
             </>
           )}

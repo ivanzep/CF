@@ -49,7 +49,7 @@ export function CashflowChart({ months, monthly }: Props) {
   const isDark = useIsDark();
   const colors = isDark ? palette.dark : palette.light;
   const data = months.map((m) => ({ month: m, amount: monthly[m] ?? 0 }));
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   return (
     <div className="cashflow-chart">

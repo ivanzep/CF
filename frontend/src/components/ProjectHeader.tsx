@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Project } from "../types";
 import { useProjectMutations } from "../hooks";
 import { EditableText } from "./Editable";
@@ -8,14 +9,31 @@ interface Props {
 
 export function ProjectHeader({ project }: Props) {
   const m = useProjectMutations(project.id);
+  const [collapsed, setCollapsed] = useState(true);
+
+  if (collapsed) {
+    return (
+      <div className="project-header project-header--collapsed">
+        <span className="project-header__collapsed-name">{project.name || "Untitled project"}</span>
+        <button className="link-button" onClick={() => setCollapsed(false)}>
+          ▸ expand
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="project-header">
-      <EditableText
-        className="project-header__name"
-        value={project.name}
-        onSave={(name) => m.updateProject.mutate({ name })}
-      />
+      <div className="project-header__top">
+        <EditableText
+          className="project-header__name"
+          value={project.name}
+          onSave={(name) => m.updateProject.mutate({ name })}
+        />
+        <button className="link-button" onClick={() => setCollapsed(true)}>
+          ▾ collapse
+        </button>
+      </div>
       <div className="project-header__meta">
         <label>
           Client
