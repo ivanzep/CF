@@ -177,11 +177,13 @@
   .summary-grid__label { text-align: left !important; position: sticky; left: 0; background: var(--surface); min-width: 260px; }
   .summary-grid__code { color: var(--text-muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
   .summary-grid__category td { font-weight: 600; background: var(--page); }
+  .summary-grid__category td.summary-grid__label { background: var(--page); }
   .summary-grid__subtotal td { font-weight: 600; border-top: 1px solid var(--border-strong); }
   .summary-grid__grandtotal td { font-weight: 700; border-top: 2px solid var(--border-strong); font-size: 13.5px; }
 
   .cashflow-chart { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
-  .cashflow-chart h3 { margin: 0 0 8px; font-size: 14px; color: var(--text-secondary); }
+  .cashflow-chart h3 { margin: 0; font-size: 14px; color: var(--text-secondary); }
+  .cashflow-chart__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
   .cashflow-chart .bar { fill: var(--accent); }
   .cashflow-chart .gridline { stroke: var(--border); stroke-width: 1; }
   .cashflow-chart .axis-label { fill: var(--text-muted); font-size: 9.5px; font-family: system-ui, sans-serif; }
@@ -254,6 +256,7 @@
   var activeTab = "summary";
   var expandedLineItemId = null;
   var expandedMemberId = null;
+  var chartCollapsed = false;
   var nextIdCounter = 1;
 
   function genId(prefix) { return prefix + "_" + (nextIdCounter++) + "_" + Math.random().toString(36).slice(2, 7); }
@@ -654,8 +657,14 @@
 
     var chartWrap = document.createElement("div");
     chartWrap.className = "cashflow-chart";
-    chartWrap.innerHTML = "<h3>Total Monthly Cashflow</h3>";
-    chartWrap.appendChild(buildChart(summary.months, summary.grandTotal.monthly));
+    chartWrap.innerHTML =
+      '<div class="cashflow-chart__header">' +
+        "<h3>Total Monthly Cashflow</h3>" +
+        '<button class="link-button" id="chartCollapseBtn">' + (chartCollapsed ? "▸ expand" : "▾ collapse") + "</button>" +
+      "</div>";
+    if (!chartCollapsed) {
+      chartWrap.appendChild(buildChart(summary.months, summary.grandTotal.monthly));
+    }
     wrap.appendChild(chartWrap);
 
     var gridWrap = document.createElement("div");
@@ -664,7 +673,7 @@
     summary.months.forEach(function (m) { html += '<th class="col-money">' + fmtMonth(m) + "</th>"; });
     html += "</tr></thead><tbody>";
     summary.categories.forEach(function (cat) {
-      html += '<tr class="summary-grid__category"><td>' + esc(cat.name) + "</td><td></td>";
+      html += '<tr class="summary-grid__category"><td class="summary-grid__label">' + esc(cat.name) + "</td><td></td>";
       summary.months.forEach(function () { html += "<td></td>"; });
       html += "</tr>";
       cat.lineItems.forEach(function (li) {
@@ -673,11 +682,11 @@
         summary.months.forEach(function (m) { html += '<td class="col-money">' + (li.monthly[m] ? fmtMoney(li.monthly[m]) : "") + "</td>"; });
         html += "</tr>";
       });
-      html += '<tr class="summary-grid__subtotal"><td>Total ' + esc(cat.name) + "</td><td class=\"col-money\">" + fmtMoney(cat.subtotalTotal) + "</td>";
+      html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money\">" + fmtMoney(cat.subtotalTotal) + "</td>";
       summary.months.forEach(function (m) { html += '<td class="col-money">' + (cat.subtotal[m] ? fmtMoney(cat.subtotal[m]) : "") + "</td>"; });
       html += "</tr>";
     });
-    html += '<tr class="summary-grid__grandtotal"><td>Grand Total</td><td class="col-money">' + fmtMoney(summary.grandTotal.total) + "</td>";
+    html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money">' + fmtMoney(summary.grandTotal.total) + "</td>";
     summary.months.forEach(function (m) { html += '<td class="col-money">' + (summary.grandTotal.monthly[m] ? fmtMoney(summary.grandTotal.monthly[m]) : "") + "</td>"; });
     html += "</tr></tbody></table>";
     gridWrap.innerHTML = html;
@@ -694,6 +703,10 @@
     }
 
     el.appendChild(wrap);
+    document.getElementById("chartCollapseBtn").addEventListener("click", function () {
+      chartCollapsed = !chartCollapsed;
+      render();
+    });
   }
 
   function buildChart(months, monthly) {

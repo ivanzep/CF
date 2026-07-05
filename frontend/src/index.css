@@ -523,12 +523,10 @@ select:focus {
 .summary-grid__category td {
   font-weight: 600;
   background: var(--page);
-  position: sticky;
-  left: 0;
 }
 
-.summary-grid__category td:first-child {
-  position: static;
+.summary-grid__category td.summary-grid__label {
+  background: var(--page);
 }
 
 .summary-grid__subtotal td {
@@ -550,9 +548,16 @@ select:focus {
 }
 
 .cashflow-chart h3 {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 14px;
   color: var(--text-secondary);
+}
+
+.cashflow-chart__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 
 .draws-summary h3 {

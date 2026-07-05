@@ -49,10 +49,17 @@ export function CashflowChart({ months, monthly }: Props) {
   const isDark = useIsDark();
   const colors = isDark ? palette.dark : palette.light;
   const data = months.map((m) => ({ month: m, amount: monthly[m] ?? 0 }));
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
     <div className="cashflow-chart">
-      <h3>Total Monthly Cashflow</h3>
+      <div className="cashflow-chart__header">
+        <h3>Total Monthly Cashflow</h3>
+        <button className="link-button" onClick={() => setCollapsed((c) => !c)}>
+          {collapsed ? "▸ expand" : "▾ collapse"}
+        </button>
+      </div>
+      {!collapsed && (
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
           <CartesianGrid vertical={false} stroke={colors.grid} strokeDasharray="0" />
@@ -75,6 +82,7 @@ export function CashflowChart({ months, monthly }: Props) {
           <Bar dataKey="amount" fill={colors.series} radius={[3, 3, 0, 0]} maxBarSize={28} />
         </BarChart>
       </ResponsiveContainer>
+      )}
     </div>
   );
 }

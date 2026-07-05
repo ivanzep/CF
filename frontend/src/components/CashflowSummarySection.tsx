@@ -39,7 +39,7 @@ export function CashflowSummarySection({ summary }: Props) {
             {summary.categories.map((cat) => (
               <Fragment key={cat.id ?? "uncat"}>
                 <tr className="summary-grid__category">
-                  <td>{cat.name}</td>
+                  <td className="summary-grid__label">{cat.name}</td>
                   <td className="col-money"></td>
                   {summary.months.map((m) => (
                     <td key={m} className="col-money"></td>
@@ -60,7 +60,7 @@ export function CashflowSummarySection({ summary }: Props) {
                   </tr>
                 ))}
                 <tr className="summary-grid__subtotal">
-                  <td>Total {cat.name}</td>
+                  <td className="summary-grid__label">Total {cat.name}</td>
                   <td className="col-money">{fmtMoney(cat.subtotalTotal)}</td>
                   {summary.months.map((m) => (
                     <td key={m} className="col-money">
@@ -71,7 +71,7 @@ export function CashflowSummarySection({ summary }: Props) {
               </Fragment>
             ))}
             <tr className="summary-grid__grandtotal">
-              <td>Grand Total</td>
+              <td className="summary-grid__label">Grand Total</td>
               <td className="col-money">{fmtMoney(summary.grandTotal.total)}</td>
               {summary.months.map((m) => (
                 <td key={m} className="col-money">
