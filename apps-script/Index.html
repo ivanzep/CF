@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<title>Cashflow Tracker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --surface: #fcfcfb;
+    --page: #f2f1ed;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --border: #e1e0d9;
+    --border-strong: #c3c2b7;
+    --accent: #2a78d6;
+    --accent-bg: rgba(42, 120, 214, 0.1);
+    --danger: #e34948;
+    --good: #0ca30c;
+    --shadow: rgba(0, 0, 0, 0.08) 0 4px 16px -4px;
+    --banner: #fdf6e3;
+    --banner-border: #eadfb4;
+    --banner-text: #6b5b1e;
+  }
+  :root[data-theme="dark"] {
+    --surface: #1a1a19;
+    --page: #121211;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --border: #2c2c2a;
+    --border-strong: #383835;
+    --accent: #3987e5;
+    --accent-bg: rgba(57, 135, 229, 0.15);
+    --danger: #e66767;
+    --good: #0ca30c;
+    --shadow: rgba(0, 0, 0, 0.4) 0 4px 16px -4px;
+    --banner: #2a2410;
+    --banner-border: #4a3f16;
+    --banner-text: #e0c869;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface: #1a1a19;
+      --page: #121211;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --border: #2c2c2a;
+      --border-strong: #383835;
+      --accent: #3987e5;
+      --accent-bg: rgba(57, 135, 229, 0.15);
+      --danger: #e66767;
+      --good: #0ca30c;
+      --shadow: rgba(0, 0, 0, 0.4) 0 4px 16px -4px;
+      --banner: #2a2410;
+      --banner-border: #4a3f16;
+      --banner-text: #e0c869;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page);
+    color: var(--text-primary);
+    font-size: 14px;
+  }
+  button, input, select { font-family: inherit; font-size: inherit; }
+  input, select {
+    color: var(--text-primary);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 6px;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+  .demo-banner {
+    background: var(--banner);
+    border-bottom: 1px solid var(--banner-border);
+    color: var(--banner-text);
+    font-size: 12.5px;
+    padding: 8px 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    text-align: center;
+  }
+  .demo-banner strong { font-weight: 700; }
+
+  .app { max-width: 1400px; margin: 0 auto; padding: 0 24px 64px; }
+
+  .app-topbar { display: flex; align-items: center; gap: 16px; padding: 20px 0; }
+  .app-topbar__title { font-weight: 700; font-size: 18px; letter-spacing: -0.01em; }
+  .app-topbar__spacer { flex: 1; }
+  .theme-toggle {
+    background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px;
+    padding: 5px 10px; cursor: pointer; color: var(--text-secondary);
+  }
+
+  .project-header {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 20px 24px; margin-bottom: 16px; box-shadow: var(--shadow);
+  }
+  .project-header__name { font-size: 22px; font-weight: 700; margin-bottom: 12px; }
+  .project-header__meta { display: flex; gap: 32px; flex-wrap: wrap; font-size: 12px; color: var(--text-muted); }
+  .project-header__meta b { display: block; color: var(--text-secondary); font-weight: 500; font-size: 13px; margin-top: 2px; }
+
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .tab {
+    background: none; border: none; padding: 10px 16px; cursor: pointer; color: var(--text-secondary);
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .tab--active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+  .section { display: flex; flex-direction: column; gap: 20px; }
+  .section__intro { color: var(--text-secondary); max-width: 720px; line-height: 1.5; }
+
+  .link-button { background: none; border: none; color: var(--accent); cursor: pointer; padding: 2px 4px; font-size: inherit; }
+  .link-button:hover { text-decoration: underline; }
+  .link-button:disabled { color: var(--text-muted); cursor: not-allowed; }
+  .link-button--danger { color: var(--danger); }
+  .secondary-button {
+    background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px;
+    padding: 8px 14px; cursor: pointer; color: var(--text-primary); align-self: flex-start;
+  }
+  .secondary-button:hover { border-color: var(--accent); }
+  .secondary-button:disabled { color: var(--text-muted); cursor: not-allowed; }
+
+  .category-group { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .category-group__header {
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    background: var(--page); border-bottom: 1px solid var(--border);
+  }
+  .category-group__title { font-weight: 600; flex: 1; }
+  .category-group__total { font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+
+  table.line-items-table, table.summary-grid { width: 100%; border-collapse: collapse; }
+  .line-items-table th, .line-items-table td { padding: 6px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
+  .line-items-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 500; }
+  .col-money { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .col-code { width: 90px; }
+  .col-date { width: 140px; }
+  .col-schedule { width: 300px; }
+  .col-actions { width: 90px; text-align: right !important; }
+
+  .editable-text, .editable-number {
+    border: 1px solid transparent; background: transparent; width: 100%; padding: 3px 4px; border-radius: 4px;
+  }
+  .editable-text:hover, .editable-number:hover { border-color: var(--border); }
+  .editable-number { text-align: right; }
+  .category-select { display: block; margin-top: 2px; font-size: 11px; color: var(--text-muted); border: none; background: transparent; padding: 0 4px; }
+
+  .add-row td { padding: 8px 16px; }
+  .total-row td { font-weight: 600; border-top: 2px solid var(--border-strong); border-bottom: none; }
+
+  .schedule-row td { background: var(--page); padding: 16px !important; }
+  .schedule-editor { display: flex; flex-direction: column; gap: 12px; }
+  .schedule-editor__mode { display: flex; gap: 24px; font-size: 13px; }
+  .schedule-editor__mode label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .schedule-editor__even { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .schedule-editor__even label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-muted); }
+  .schedule-editor__hint { font-size: 12px; color: var(--text-secondary); }
+  .schedule-editor__variance { font-size: 12px; color: var(--danger); }
+
+  .mini-table { border-collapse: collapse; font-size: 13px; }
+  .mini-table td { padding: 4px 10px 4px 0; border-bottom: 1px solid var(--border); }
+  .mini-table input { width: 130px; }
+
+  .summary-grid-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  .summary-grid { font-size: 12.5px; }
+  .summary-grid th, .summary-grid td { padding: 5px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .summary-grid th { position: sticky; top: 0; background: var(--surface); color: var(--text-muted); font-weight: 500; text-align: right; }
+  .summary-grid__label { text-align: left !important; position: sticky; left: 0; background: var(--surface); min-width: 260px; }
+  .summary-grid__code { color: var(--text-muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
+  .summary-grid__category td { font-weight: 600; background: var(--page); }
+  .summary-grid__subtotal td { font-weight: 600; border-top: 1px solid var(--border-strong); }
+  .summary-grid__grandtotal td { font-weight: 700; border-top: 2px solid var(--border-strong); font-size: 13.5px; }
+
+  .cashflow-chart { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .cashflow-chart h3 { margin: 0 0 8px; font-size: 14px; color: var(--text-secondary); }
+  .cashflow-chart .bar { fill: var(--accent); }
+  .cashflow-chart .gridline { stroke: var(--border); stroke-width: 1; }
+  .cashflow-chart .axis-label { fill: var(--text-muted); font-size: 9.5px; font-family: system-ui, sans-serif; }
+  .chart-tooltip {
+    position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 10px; font-size: 12px; box-shadow: var(--shadow); display: none; z-index: 10;
+  }
+
+  .draws-summary h3 { font-size: 14px; color: var(--text-secondary); }
+
+  .auto-split { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .auto-split h3 { margin: 0 0 12px; font-size: 14px; color: var(--text-secondary); }
+  .auto-split__controls { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  .auto-split__controls label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-muted); }
+  .auto-badge { display: block; font-size: 10px; color: var(--text-muted); text-align: right; }
+
+  .ledger { display: flex; gap: 32px; flex-wrap: wrap; }
+  .ledger__column h4 { margin: 0 0 8px; font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(8px);
+    background: var(--text-primary); color: var(--surface); padding: 8px 16px; border-radius: 6px;
+    font-size: 12.5px; opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 50;
+  }
+  .toast--visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="app-topbar">
+    <span class="app-topbar__title">Cashflow Tracker</span>
+    <div class="app-topbar__spacer"></div>
+    <button class="theme-toggle" id="themeToggle" type="button">◐ Toggle theme</button>
+  </header>
+  <div id="bootMessage" class="section__intro" style="padding: 0 0 16px;">Loading your data…</div>
+
+  <div class="project-header" id="projectHeader"></div>
+
+  <nav class="tabs" id="tabs"></nav>
+  <div id="tabContent"></div>
+</div>
+
+<div class="chart-tooltip" id="chartTooltip"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- state ----------
+  var project = null;
+  var activeTab = "summary";
+  var expandedLineItemId = null;
+  var expandedMemberId = null;
+  var nextIdCounter = 1;
+
+  function genId(prefix) { return prefix + "_" + (nextIdCounter++) + "_" + Math.random().toString(36).slice(2, 7); }
+
+  function showToast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("toast--visible");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(function () { t.classList.remove("toast--visible"); }, 1800);
+  }
+
+  function persist() {
+    showToast("Saving…");
+    google.script.run
+      .withSuccessHandler(function () { showToast("Saved"); })
+      .withFailureHandler(function (err) { showToast("Save failed: " + (err && err.message ? err.message : err)); })
+      .saveProject(project);
+  }
+
+  function boot() {
+    google.script.run
+      .withSuccessHandler(function (p) {
+        project = p;
+        var isEmpty = project.categories.length === 0 && project.lineItems.length === 0 &&
+          project.draws.length === 0 && project.capTable.length === 0;
+        if (isEmpty) renderEmptyState();
+        else render();
+      })
+      .withFailureHandler(function (err) {
+        document.getElementById("bootMessage").textContent =
+          "Failed to load: " + (err && err.message ? err.message : err);
+      })
+      .getProject();
+  }
+
+  function renderEmptyState() {
+    document.getElementById("bootMessage").style.display = "none";
+    document.getElementById("tabs").innerHTML = "";
+    var el = document.getElementById("tabContent");
+    el.innerHTML =
+      '<div class="section" style="text-align:center; padding: 48px 16px;">' +
+        '<h1 style="margin: 0 0 8px; font-size: 22px;">' + esc(project.name) + '</h1>' +
+        '<p class="section__intro" style="margin: 0 auto 20px;">This sheet has no cashflow data yet.</p>' +
+        '<div style="display:flex; gap:12px; justify-content:center;">' +
+          '<button class="secondary-button" id="startBlankBtn">Start blank</button>' +
+          '<button class="secondary-button" id="loadExampleBtn">Load La Costa Hotel example</button>' +
+        '</div>' +
+      '</div>';
+    document.getElementById("startBlankBtn").addEventListener("click", function () { render(); });
+    document.getElementById("loadExampleBtn").addEventListener("click", function () {
+      el.innerHTML = '<p class="section__intro">Loading example data…</p>';
+      google.script.run
+        .withSuccessHandler(function (p) { project = p; render(); })
+        .withFailureHandler(function (err) { alert("Failed to load example data: " + (err && err.message ? err.message : err)); })
+        .loadExampleData();
+    });
+  }
+
+  // ---------- formatting ----------
+  function fmtMoney(n, cents) {
+    if (n == null || isNaN(n)) return "—";
+    return n.toLocaleString("en-US", {
+      style: "currency", currency: "USD",
+      maximumFractionDigits: cents ? 2 : 0, minimumFractionDigits: cents ? 2 : 0,
+    });
+  }
+  function fmtMonth(iso) {
+    var p = iso.split("-").map(Number);
+    return new Date(Date.UTC(p[0], p[1] - 1, 1)).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+  }
+  function fmtDate(iso) {
+    if (!iso) return "—";
+    var p = iso.split("-").map(Number);
+    return new Date(Date.UTC(p[0], p[1] - 1, p[2])).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function sum(arr) { return arr.reduce(function (a, b) { return a + b; }, 0); }
+  function round(n) { return Math.round(n * 10000) / 10000; }
+  function round2(n) { return Math.round(n * 100) / 100; }
+
+  // ---------- schedule engine (mirrors backend logic) ----------
+  function computeEvenSchedule(startISO, endISO, total) {
+    var s = startISO.split("-").map(Number), e = endISO.split("-").map(Number);
+    var startKey = s[0] * 12 + (s[1] - 1), endKey = e[0] * 12 + (e[1] - 1);
+    if (endKey < startKey) return [];
+    var numMonths = endKey - startKey + 1;
+    var perMonth = round2(total / numMonths);
+    var buckets = [], allocated = 0;
+    for (var i = 0; i < numMonths; i++) {
+      var isLast = i === numMonths - 1;
+      var amount = isLast ? round2(total - allocated) : perMonth;
+      allocated += amount;
+      var key = startKey + i, y = Math.floor(key / 12), m = key % 12;
+      buckets.push({ date: y + "-" + String(m + 1).padStart(2, "0") + "-01", amount: amount });
+    }
+    return buckets;
+  }
+  function getLineItemSchedule(item) {
+    if (item.scheduleMode === "CUSTOM") {
+      return item.payments.slice().sort(function (a, b) { return a.date.localeCompare(b.date); })
+        .map(function (p) { return { date: p.date.slice(0, 10), amount: p.amount }; });
+    }
+    if (!item.startDate || !item.endDate) return [];
+    return computeEvenSchedule(item.startDate.slice(0, 10), item.endDate.slice(0, 10), item.totalBudget);
+  }
+  function computeCapTable(members) {
+    var totals = members.map(function (m) {
+      return { member: m, totalContributed: sum(m.contributions.map(function (c) { return c.amount; })),
+        totalDistributed: sum(m.distributions.map(function (d) { return d.amount; })) };
+    });
+    var manualTotalPercent = sum(members.filter(function (m) { return m.ownershipPercent != null; }).map(function (m) { return m.ownershipPercent; }));
+    var remainingPercent = Math.max(0, 100 - manualTotalPercent);
+    var proRataBase = sum(totals.filter(function (t) { return t.member.ownershipPercent == null; }).map(function (t) { return t.totalContributed; }));
+    return totals.map(function (t) {
+      var ownershipPercent;
+      if (t.member.ownershipPercent != null) ownershipPercent = t.member.ownershipPercent;
+      else if (proRataBase > 0) ownershipPercent = (t.totalContributed / proRataBase) * remainingPercent;
+      else ownershipPercent = 0;
+      return {
+        id: t.member.id, name: t.member.name, role: t.member.role,
+        totalContributed: t.totalContributed, totalDistributed: t.totalDistributed,
+        netPosition: t.totalContributed - t.totalDistributed,
+        ownershipPercent: round(ownershipPercent), ownershipIsManual: t.member.ownershipPercent != null,
+      };
+    });
+  }
+  function autoSplitAmount(rows, totalAmount) {
+    var totalPercent = sum(rows.map(function (r) { return r.ownershipPercent; }));
+    if (totalPercent <= 0) return rows.map(function (r) { return { memberId: r.id, amount: 0 }; });
+    var allocated = 0;
+    return rows.map(function (r, i) {
+      var isLast = i === rows.length - 1;
+      var amount = isLast ? round2(totalAmount - allocated) : round2((r.ownershipPercent / totalPercent) * totalAmount);
+      allocated += amount;
+      return { memberId: r.id, amount: amount };
+    });
+  }
+
+  function buildSummary(proj) {
+    var itemsWithSchedule = proj.lineItems.map(function (li) { return { li: li, schedule: getLineItemSchedule(li) }; });
+    var minKey = null, maxKey = null;
+    function consider(iso) {
+      var p = iso.split("-").map(Number), k = p[0] * 12 + (p[1] - 1);
+      minKey = minKey === null ? k : Math.min(minKey, k);
+      maxKey = maxKey === null ? k : Math.max(maxKey, k);
+    }
+    itemsWithSchedule.forEach(function (x) { x.schedule.forEach(function (b) { consider(b.date.slice(0, 7) + "-01"); }); });
+    proj.draws.forEach(function (d) { consider(d.date.slice(0, 10)); });
+    var months = [];
+    if (minKey !== null) for (var k = minKey; k <= maxKey; k++) { var y = Math.floor(k / 12), m = k % 12; months.push(y + "-" + String(m + 1).padStart(2, "0") + "-01"); }
+
+    function monthlyMapFor(schedule) {
+      var map = {};
+      schedule.forEach(function (b) { var key = b.date.slice(0, 7) + "-01"; map[key] = (map[key] || 0) + b.amount; });
+      return map;
+    }
+
+    var categoryList = proj.categories.map(function (c) { return { id: c.id, name: c.name }; }).concat([{ id: null, name: "Uncategorized" }]);
+    var categories = categoryList.map(function (cat) {
+      var items = itemsWithSchedule.filter(function (x) { return x.li.categoryId === cat.id; });
+      if (items.length === 0) return null;
+      var lineItems = items.map(function (x) {
+        return { id: x.li.id, code: x.li.code, description: x.li.description, totalBudget: x.li.totalBudget,
+          scheduleMode: x.li.scheduleMode, monthly: monthlyMapFor(x.schedule) };
+      });
+      var subtotal = {}, subtotalTotal = 0;
+      lineItems.forEach(function (lo) {
+        Object.keys(lo.monthly).forEach(function (mo) { subtotal[mo] = (subtotal[mo] || 0) + lo.monthly[mo]; });
+        subtotalTotal += lo.totalBudget;
+      });
+      return { id: cat.id, name: cat.name, lineItems: lineItems, subtotal: subtotal, subtotalTotal: subtotalTotal };
+    }).filter(function (c) { return c !== null; });
+
+    var grandMonthly = {}, grandTotal = 0;
+    categories.forEach(function (cat) {
+      Object.keys(cat.subtotal).forEach(function (mo) { grandMonthly[mo] = (grandMonthly[mo] || 0) + cat.subtotal[mo]; });
+      grandTotal += cat.subtotalTotal;
+    });
+
+    var capTableRows = computeCapTable(proj.capTable);
+    return {
+      months: months, categories: categories, grandTotal: { monthly: grandMonthly, total: grandTotal },
+      draws: proj.draws, capTable: capTableRows,
+      equityTotals: {
+        totalContributed: sum(capTableRows.map(function (r) { return r.totalContributed; })),
+        totalDistributed: sum(capTableRows.map(function (r) { return r.totalDistributed; })),
+      },
+    };
+  }
+
+  // ---------- render orchestration ----------
+  function render() {
+    document.getElementById("bootMessage").style.display = "none";
+    renderHeader();
+    renderTabs();
+    renderTabContent();
+  }
+
+  function renderHeader() {
+    var el = document.getElementById("projectHeader");
+    el.innerHTML =
+      '<input class="editable-text" style="font-size:22px;font-weight:700;border:none;background:transparent;width:100%;margin-bottom:12px;padding:2px 0;" ' +
+        'value="' + esc(project.name) + '" data-bind="project.name" />' +
+      '<div class="project-header__meta">' +
+        '<label>Client<b><input class="editable-text" value="' + esc(project.client || "") + '" placeholder="—" data-bind="project.client" /></b></label>' +
+        '<label>Address<b><input class="editable-text" value="' + esc(project.address || "") + '" placeholder="—" data-bind="project.address" /></b></label>' +
+        '<label>Date<b><input type="date" value="' + esc(project.projectDate) + '" data-bind="project.projectDate" /></b></label>' +
+      '</div>';
+    bindInputs(el);
+  }
+
+  function bindInputs(container) {
+    container.querySelectorAll("[data-bind]").forEach(function (input) {
+      var handler = function () {
+        var path = input.getAttribute("data-bind");
+        if (path === "project.name") project.name = input.value;
+        if (path === "project.client") project.client = input.value;
+        if (path === "project.address") project.address = input.value;
+        if (path === "project.projectDate") project.projectDate = input.value;
+      };
+      input.addEventListener("change", function () {
+        handler();
+        persist();
+      });
+    });
+  }
+
+  function renderTabs() {
+    var tabs = [
+      ["summary", "Cash Flow Summary"], ["line-items", "Line Items"],
+      ["draws", "Draws"], ["cap-table", "Cap Table"],
+    ];
+    document.getElementById("tabs").innerHTML = tabs.map(function (t) {
+      return '<button class="tab' + (activeTab === t[0] ? " tab--active" : "") + '" data-tab="' + t[0] + '">' + t[1] + "</button>";
+    }).join("");
+    document.querySelectorAll(".tab").forEach(function (btn) {
+      btn.addEventListener("click", function () { activeTab = btn.getAttribute("data-tab"); render(); });
+    });
+  }
+
+  function renderTabContent() {
+    var el = document.getElementById("tabContent");
+    if (activeTab === "summary") el.innerHTML = "", renderSummaryTab(el);
+    else if (activeTab === "line-items") el.innerHTML = "", renderLineItemsTab(el);
+    else if (activeTab === "draws") el.innerHTML = "", renderDrawsTab(el);
+    else if (activeTab === "cap-table") el.innerHTML = "", renderCapTableTab(el);
+  }
+
+  // ---------- Cash Flow Summary ----------
+  function renderSummaryTab(el) {
+    var summary = buildSummary(project);
+    var wrap = document.createElement("div");
+    wrap.className = "section";
+
+    if (summary.months.length === 0) {
+      wrap.innerHTML = '<p class="section__intro">No scheduled payments yet.</p>';
+      el.appendChild(wrap);
+      return;
+    }
+
+    var chartWrap = document.createElement("div");
+    chartWrap.className = "cashflow-chart";
+    chartWrap.innerHTML = "<h3>Total Monthly Cashflow</h3>";
+    chartWrap.appendChild(buildChart(summary.months, summary.grandTotal.monthly));
+    wrap.appendChild(chartWrap);
+
+    var gridWrap = document.createElement("div");
+    gridWrap.className = "summary-grid-wrap";
+    var html = '<table class="summary-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money">Budget</th>';
+    summary.months.forEach(function (m) { html += '<th class="col-money">' + fmtMonth(m) + "</th>"; });
+    html += "</tr></thead><tbody>";
+    summary.categories.forEach(function (cat) {
+      html += '<tr class="summary-grid__category"><td>' + esc(cat.name) + "</td><td></td>";
+      summary.months.forEach(function () { html += "<td></td>"; });
+      html += "</tr>";
+      cat.lineItems.forEach(function (li) {
+        html += '<tr><td class="summary-grid__label">' + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
+        html += '<td class="col-money">' + fmtMoney(li.totalBudget) + "</td>";
+        summary.months.forEach(function (m) { html += '<td class="col-money">' + (li.monthly[m] ? fmtMoney(li.monthly[m]) : "") + "</td>"; });
+        html += "</tr>";
+      });
+      html += '<tr class="summary-grid__subtotal"><td>Total ' + esc(cat.name) + "</td><td class=\"col-money\">" + fmtMoney(cat.subtotalTotal) + "</td>";
+      summary.months.forEach(function (m) { html += '<td class="col-money">' + (cat.subtotal[m] ? fmtMoney(cat.subtotal[m]) : "") + "</td>"; });
+      html += "</tr>";
+    });
+    html += '<tr class="summary-grid__grandtotal"><td>Grand Total</td><td class="col-money">' + fmtMoney(summary.grandTotal.total) + "</td>";
+    summary.months.forEach(function (m) { html += '<td class="col-money">' + (summary.grandTotal.monthly[m] ? fmtMoney(summary.grandTotal.monthly[m]) : "") + "</td>"; });
+    html += "</tr></tbody></table>";
+    gridWrap.innerHTML = html;
+    wrap.appendChild(gridWrap);
+
+    if (summary.draws.length) {
+      var drawsWrap = document.createElement("div");
+      drawsWrap.className = "draws-summary";
+      var dh = "<h3>Draws</h3><table class=\"mini-table\"><tbody>";
+      summary.draws.forEach(function (d) { dh += "<tr><td>" + esc(d.name) + "</td><td>" + esc(d.date) + "</td><td>" + fmtMoney(d.amount, true) + "</td><td>" + esc(d.source || "") + "</td></tr>"; });
+      dh += "</tbody></table>";
+      drawsWrap.innerHTML = dh;
+      wrap.appendChild(drawsWrap);
+    }
+
+    el.appendChild(wrap);
+  }
+
+  function buildChart(months, monthly) {
+    var w = 1200, h = 220, padL = 70, padB = 24, padT = 10, padR = 10;
+    var data = months.map(function (m) { return monthly[m] || 0; });
+    var maxVal = Math.max.apply(null, data.concat([1]));
+    var niceMax = Math.pow(10, Math.floor(Math.log10(maxVal))) * Math.ceil(maxVal / Math.pow(10, Math.floor(Math.log10(maxVal))));
+    var plotW = w - padL - padR, plotH = h - padT - padB;
+    var barW = Math.max(2, (plotW / data.length) * 0.62);
+    var gap = plotW / data.length;
+
+    var svgNS = "http://www.w3.org/2000/svg";
+    var svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", "0 0 " + w + " " + h);
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("height", h);
+    svg.style.display = "block";
+    svg.style.overflow = "visible";
+
+    [0, 0.25, 0.5, 0.75, 1].forEach(function (frac) {
+      var y = padT + plotH * (1 - frac);
+      var line = document.createElementNS(svgNS, "line");
+      line.setAttribute("x1", padL); line.setAttribute("x2", w - padR);
+      line.setAttribute("y1", y); line.setAttribute("y2", y);
+      line.setAttribute("class", "gridline");
+      svg.appendChild(line);
+      var label = document.createElementNS(svgNS, "text");
+      label.setAttribute("x", padL - 8); label.setAttribute("y", y + 3);
+      label.setAttribute("text-anchor", "end"); label.setAttribute("class", "axis-label");
+      label.textContent = fmtMoney(niceMax * frac);
+      svg.appendChild(label);
+    });
+
+    var tooltip = document.getElementById("chartTooltip");
+    data.forEach(function (val, i) {
+      var barH = niceMax > 0 ? (val / niceMax) * plotH : 0;
+      var x = padL + gap * i + (gap - barW) / 2;
+      var y = padT + plotH - barH;
+      var rect = document.createElementNS(svgNS, "rect");
+      rect.setAttribute("x", x); rect.setAttribute("y", y);
+      rect.setAttribute("width", barW); rect.setAttribute("height", Math.max(barH, 0));
+      rect.setAttribute("rx", 2.5);
+      rect.setAttribute("class", "bar");
+      rect.style.cursor = "pointer";
+      rect.addEventListener("mousemove", function (ev) {
+        tooltip.style.display = "block";
+        tooltip.innerHTML = "<div style='color:var(--text-muted);margin-bottom:2px'>" + fmtMonth(months[i]) + "</div><div style='font-variant-numeric:tabular-nums'>" + fmtMoney(val) + "</div>";
+        tooltip.style.left = ev.pageX + 12 + "px";
+        tooltip.style.top = ev.pageY - 36 + "px";
+      });
+      rect.addEventListener("mouseleave", function () { tooltip.style.display = "none"; });
+      svg.appendChild(rect);
+      if (i % Math.max(1, Math.floor(data.length / 12)) === 0) {
+        var xl = document.createElementNS(svgNS, "text");
+        xl.setAttribute("x", x + barW / 2); xl.setAttribute("y", h - 6);
+        xl.setAttribute("text-anchor", "middle"); xl.setAttribute("class", "axis-label");
+        xl.textContent = fmtMonth(months[i]);
+        svg.appendChild(xl);
+      }
+    });
+
+    var holder = document.createElement("div");
+    holder.style.position = "relative";
+    holder.appendChild(svg);
+    return holder;
+  }
+
+  // ---------- Line Items ----------
+  function renderLineItemsTab(el) {
+    var wrap = document.createElement("div");
+    wrap.className = "section";
+
+    var groups = project.categories.map(function (c) { return { id: c.id, name: c.name }; })
+      .concat([{ id: null, name: "Uncategorized" }])
+      .map(function (cat) { return Object.assign({}, cat, { items: project.lineItems.filter(function (li) { return li.categoryId === cat.id; }) }); })
+      .filter(function (g) { return g.id !== null || g.items.length > 0; });
+
+    groups.forEach(function (group) {
+      var groupEl = document.createElement("div");
+      groupEl.className = "category-group";
+      var total = sum(group.items.map(function (i) { return i.totalBudget; }));
+      var headerHtml = '<div class="category-group__header">';
+      if (group.id) {
+        headerHtml += '<input class="editable-text category-group__title" value="' + esc(group.name) + '" data-cat-rename="' + group.id + '" />';
+      } else {
+        headerHtml += '<span class="category-group__title" style="color:var(--text-muted);font-weight:500;">' + esc(group.name) + "</span>";
+      }
+      headerHtml += '<span class="category-group__total">' + fmtMoney(total) + "</span>";
+      if (group.id) headerHtml += '<button class="link-button link-button--danger" data-cat-delete="' + group.id + '">delete category</button>';
+      headerHtml += "</div>";
+
+      var tableHtml = '<table class="line-items-table"><thead><tr><th class="col-code">Code</th><th>Description</th><th class="col-money">Budget</th><th class="col-schedule">Schedule</th><th class="col-actions"></th></tr></thead><tbody>';
+      group.items.forEach(function (li) { tableHtml += lineItemRowHtml(li); });
+      tableHtml += '<tr class="add-row"><td colspan="5"><button class="link-button" data-add-item="' + (group.id || "") + '">+ add line item</button></td></tr></tbody></table>';
+
+      groupEl.innerHTML = headerHtml + tableHtml;
+      wrap.appendChild(groupEl);
+    });
+
+    var addCatBtn = document.createElement("button");
+    addCatBtn.className = "secondary-button";
+    addCatBtn.textContent = "+ add category";
+    addCatBtn.addEventListener("click", function () {
+      var name = prompt("Category name?");
+      if (name) {
+        project.categories.push({ id: genId("cat"), name: name, sortOrder: project.categories.length });
+        render();
+        persist();
+      }
+    });
+    wrap.appendChild(addCatBtn);
+
+    el.appendChild(wrap);
+    wireLineItemEvents(el);
+  }
+
+  function lineItemRowHtml(li) {
+    var schedule = getLineItemSchedule(li);
+    var summary = li.scheduleMode === "EVEN"
+      ? (li.startDate && li.endDate ? "Even, " + li.startDate + " → " + li.endDate : "Even (set dates)")
+      : schedule.length + " custom payment" + (schedule.length === 1 ? "" : "s");
+    var catOptions = '<option value="">Uncategorized</option>' + project.categories.map(function (c) {
+      return '<option value="' + c.id + '"' + (li.categoryId === c.id ? " selected" : "") + ">" + esc(c.name) + "</option>";
+    }).join("");
+    var rows = '<tr data-item-row="' + li.id + '">' +
+      '<td class="col-code"><input class="editable-text" value="' + esc(li.code || "") + '" data-item-field="code" data-item-id="' + li.id + '" /></td>' +
+      '<td><input class="editable-text" value="' + esc(li.description) + '" data-item-field="description" data-item-id="' + li.id + '" />' +
+      '<select class="category-select" data-item-field="categoryId" data-item-id="' + li.id + '">' + catOptions + "</select></td>" +
+      '<td class="col-money"><input type="number" class="editable-number" value="' + li.totalBudget + '" data-item-field="totalBudget" data-item-id="' + li.id + '" /></td>' +
+      '<td class="col-schedule"><button class="link-button" data-toggle-schedule="' + li.id + '">' + (expandedLineItemId === li.id ? "▾ " : "▸ ") + esc(summary) + "</button></td>" +
+      '<td class="col-actions"><button class="link-button link-button--danger" data-delete-item="' + li.id + '">delete</button></td>' +
+      "</tr>";
+    if (expandedLineItemId === li.id) {
+      rows += '<tr class="schedule-row"><td colspan="5">' + scheduleEditorHtml(li) + "</td></tr>";
+    }
+    return rows;
+  }
+
+  function scheduleEditorHtml(li) {
+    var isEven = li.scheduleMode === "EVEN";
+    var html = '<div class="schedule-editor">' +
+      '<div class="schedule-editor__mode">' +
+        '<label><input type="radio" name="mode-' + li.id + '"' + (isEven ? " checked" : "") + ' data-mode-radio="' + li.id + '" value="EVEN" /> Spread evenly between dates</label>' +
+        '<label><input type="radio" name="mode-' + li.id + '"' + (!isEven ? " checked" : "") + ' data-mode-radio="' + li.id + '" value="CUSTOM" /> Specific payment dates</label>' +
+      "</div>";
+    if (isEven) {
+      var schedule = getLineItemSchedule(li);
+      html += '<div class="schedule-editor__even">' +
+        '<label>Start<input type="date" value="' + esc(li.startDate || "") + '" data-even-field="startDate" data-item-id="' + li.id + '" /></label>' +
+        '<label>End<input type="date" value="' + esc(li.endDate || "") + '" data-even-field="endDate" data-item-id="' + li.id + '" /></label>';
+      if (li.startDate && li.endDate) {
+        html += '<span class="schedule-editor__hint">' + schedule.length + " monthly payment" + (schedule.length === 1 ? "" : "s") + " of " + fmtMoney(li.totalBudget / Math.max(schedule.length, 1)) + " each</span>";
+      }
+      html += "</div>";
+    } else {
+      var scheduleTotal = sum(li.payments.map(function (p) { return p.amount; }));
+      var variance = scheduleTotal - li.totalBudget;
+      html += '<div class="schedule-editor__custom"><table class="mini-table"><thead><tr><th>Date</th><th>Amount</th><th></th></tr></thead><tbody>';
+      li.payments.slice().sort(function (a, b) { return a.date.localeCompare(b.date); }).forEach(function (p) {
+        html += "<tr><td>" + fmtDate(p.date) + "</td><td>" + fmtMoney(p.amount, true) + '</td><td><button class="link-button" data-remove-payment="' + li.id + "|" + p.id + '">remove</button></td></tr>';
+      });
+      html += '<tr><td><input type="date" data-new-payment-date="' + li.id + '" /></td><td><input type="number" placeholder="0.00" data-new-payment-amount="' + li.id + '" /></td>' +
+        '<td><button class="link-button" data-add-payment="' + li.id + '">add</button></td></tr></tbody></table>';
+      if (Math.abs(variance) > 0.01) {
+        html += '<div class="schedule-editor__variance">Payments total ' + fmtMoney(scheduleTotal, true) + ", budget is " + fmtMoney(li.totalBudget, true) + " (" + (variance > 0 ? "+" : "") + fmtMoney(variance, true) + ")</div>";
+      }
+      html += "</div>";
+    }
+    html += "</div>";
+    return html;
+  }
+
+  function findLineItem(id) { return project.lineItems.filter(function (li) { return li.id === id; })[0]; }
+
+  function wireLineItemEvents(root) {
+    root.querySelectorAll("[data-item-field]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var li = findLineItem(input.getAttribute("data-item-id"));
+        var field = input.getAttribute("data-item-field");
+        if (field === "totalBudget") li[field] = Number(input.value) || 0;
+        else if (field === "categoryId") li[field] = input.value || null;
+        else li[field] = input.value;
+        render();
+        persist();
+      });
+    });
+    root.querySelectorAll("[data-cat-rename]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var cat = project.categories.filter(function (c) { return c.id === input.getAttribute("data-cat-rename"); })[0];
+        cat.name = input.value;
+        render();
+        persist();
+      });
+    });
+    root.querySelectorAll("[data-cat-delete]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-cat-delete");
+        var hasItems = project.lineItems.some(function (li) { return li.categoryId === id; });
+        if (hasItems) { alert("Move or delete line items out of this category first."); return; }
+        project.categories = project.categories.filter(function (c) { return c.id !== id; });
+        render();
+        persist();
+      });
+    });
+    root.querySelectorAll("[data-add-item]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var catId = btn.getAttribute("data-add-item") || null;
+        project.lineItems.push({ id: genId("li"), categoryId: catId, code: "", description: "New line item", totalBudget: 0, scheduleMode: "EVEN", startDate: null, endDate: null, sortOrder: project.lineItems.length, payments: [] });
+        render();
+        persist();
+      });
+    });
+    root.querySelectorAll("[data-delete-item]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-delete-item");
+        var li = findLineItem(id);
+        if (confirm('Delete "' + li.description + '"?')) {
+          project.lineItems = project.lineItems.filter(function (x) { return x.id !== id; });
+          render();
+          persist();
+        }
+      });
+    });
+    root.querySelectorAll("[data-toggle-schedule]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-toggle-schedule");
+        expandedLineItemId = expandedLineItemId === id ? null : id;
+        render();
+      });
+    });
+    root.querySelectorAll("[data-mode-radio]").forEach(function (radio) {
+      radio.addEventListener("change", function () {
+        findLineItem(radio.getAttribute("data-mode-radio")).scheduleMode = radio.value;
+        render();
+        persist();
+      });
+    });
+    root.querySelectorAll("[data-even-field]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        findLineItem(input.getAttribute("data-item-id"))[input.getAttribute("data-even-field")] = input.value;
+        render();
+        persist();
+      });
+    });
+    root.querySelectorAll("[data-add-payment]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-add-payment");
+        var dateInput = root.querySelector('[data-new-payment-date="' + id + '"]');
+        var amountInput = root.querySelector('[data-new-payment-amount="' + id + '"]');
+        if (!dateInput.value || !amountInput.value) return;
+        findLineItem(id).payments.push({ id: genId("pay"), date: dateInput.value, amount: Number(amountInput.value) });
+        render();
+        persist();
+      });
+    });
+    root.querySelectorAll("[data-remove-payment]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var parts = btn.getAttribute("data-remove-payment").split("|");
+        var li = findLineItem(parts[0]);
+        li.payments = li.payments.filter(function (p) { return p.id !== parts[1]; });
+        render();
+        persist();
+      });
+    });
+  }
+
+  // ---------- Draws ----------
+  function renderDrawsTab(el) {
+    var wrap = document.createElement("div");
+    wrap.className = "section";
+    var total = sum(project.draws.map(function (d) { return d.amount; }));
+    var html = '<p class="section__intro">Define the draw structure for this project — construction loan draws, equity calls, or any other funding event. Each draw has a name, a date, and an amount you can edit freely.</p>' +
+      '<table class="line-items-table"><thead><tr><th>Draw</th><th class="col-date">Date</th><th class="col-money">Amount</th><th>Source</th><th class="col-actions"></th></tr></thead><tbody>';
+    project.draws.forEach(function (d) {
+      html += "<tr>" +
+        '<td><input class="editable-text" value="' + esc(d.name) + '" data-draw-field="name" data-draw-id="' + d.id + '" /></td>' +
+        '<td class="col-date"><input type="date" value="' + esc(d.date) + '" data-draw-field="date" data-draw-id="' + d.id + '" /></td>' +
+        '<td class="col-money"><input type="number" class="editable-number" value="' + d.amount + '" data-draw-field="amount" data-draw-id="' + d.id + '" /></td>' +
+        '<td><input class="editable-text" value="' + esc(d.source || "") + '" placeholder="e.g. Construction Loan" data-draw-field="source" data-draw-id="' + d.id + '" /></td>' +
+        '<td class="col-actions"><button class="link-button link-button--danger" data-draw-delete="' + d.id + '">delete</button></td>' +
+        "</tr>";
+    });
+    html += '<tr class="add-row"><td colspan="5"><button class="link-button" id="addDrawBtn">+ add draw</button></td></tr>' +
+      '<tr class="total-row"><td>Total</td><td class="col-date"></td><td class="col-money">' + fmtMoney(total) + "</td><td colspan=\"2\"></td></tr></tbody></table>";
+    wrap.innerHTML = html;
+    el.appendChild(wrap);
+
+    wrap.querySelectorAll("[data-draw-field]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var draw = project.draws.filter(function (d) { return d.id === input.getAttribute("data-draw-id"); })[0];
+        var field = input.getAttribute("data-draw-field");
+        draw[field] = field === "amount" ? Number(input.value) || 0 : input.value;
+        render();
+        persist();
+      });
+    });
+    wrap.querySelectorAll("[data-draw-delete]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-draw-delete");
+        var d = project.draws.filter(function (x) { return x.id === id; })[0];
+        if (confirm('Delete "' + d.name + '"?')) {
+          project.draws = project.draws.filter(function (x) { return x.id !== id; });
+          render();
+          persist();
+        }
+      });
+    });
+    wrap.querySelector("#addDrawBtn").addEventListener("click", function () {
+      project.draws.push({ id: genId("draw"), name: "Draw " + (project.draws.length + 1), date: new Date().toISOString().slice(0, 10), amount: 0, source: "", sortOrder: project.draws.length });
+      render();
+      persist();
+    });
+  }
+
+  // ---------- Cap Table ----------
+  function renderCapTableTab(el) {
+    var summary = buildSummary(project);
+    var computedById = {};
+    summary.capTable.forEach(function (r) { computedById[r.id] = r; });
+
+    var wrap = document.createElement("div");
+    wrap.className = "section";
+    var html = '<p class="section__intro">Track each member\'s capital contributions and adjust their draws (distributions). Ownership % is computed pro-rata from contributions unless you set a manual override.</p>' +
+      '<table class="line-items-table"><thead><tr><th>Member</th><th>Role</th><th class="col-money">Ownership %</th><th class="col-money">Contributed</th><th class="col-money">Distributed</th><th class="col-money">Net Position</th><th class="col-actions"></th></tr></thead><tbody>';
+
+    project.capTable.forEach(function (member) {
+      var computed = computedById[member.id];
+      html += "<tr>" +
+        '<td><input class="editable-text" value="' + esc(member.name) + '" data-member-field="name" data-member-id="' + member.id + '" /></td>' +
+        '<td><select data-member-field="role" data-member-id="' + member.id + '">' +
+          '<option value="GP"' + (member.role === "GP" ? " selected" : "") + ">GP</option>" +
+          '<option value="LP"' + (member.role === "LP" ? " selected" : "") + ">LP</option></select></td>" +
+        '<td class="col-money"><input type="number" class="editable-number" placeholder="auto" value="' + (member.ownershipPercent == null ? "" : member.ownershipPercent) + '" data-member-field="ownershipPercent" data-member-id="' + member.id + '" />' +
+          (member.ownershipPercent == null ? '<span class="auto-badge">auto: ' + computed.ownershipPercent.toFixed(2) + "%</span>" : "") + "</td>" +
+        '<td class="col-money">' + fmtMoney(computed.totalContributed) + "</td>" +
+        '<td class="col-money">' + fmtMoney(computed.totalDistributed) + "</td>" +
+        '<td class="col-money">' + fmtMoney(computed.netPosition) + "</td>" +
+        '<td class="col-actions"><button class="link-button" data-toggle-ledger="' + member.id + '">' + (expandedMemberId === member.id ? "▾ ledger" : "▸ ledger") + "</button> " +
+          '<button class="link-button link-button--danger" data-member-delete="' + member.id + '">delete</button></td>' +
+        "</tr>";
+      if (expandedMemberId === member.id) {
+        html += '<tr class="schedule-row"><td colspan="7">' + ledgerHtml(member) + "</td></tr>";
+      }
+    });
+
+    html += '<tr class="add-row"><td colspan="7"><button class="link-button" id="addMemberBtn">+ add member</button></td></tr>' +
+      '<tr class="total-row"><td>Total</td><td></td><td class="col-money">' + sum(summary.capTable.map(function (r) { return r.ownershipPercent; })).toFixed(2) + '%</td>' +
+      '<td class="col-money">' + fmtMoney(summary.equityTotals.totalContributed) + '</td>' +
+      '<td class="col-money">' + fmtMoney(summary.equityTotals.totalDistributed) + '</td>' +
+      '<td class="col-money">' + fmtMoney(summary.equityTotals.totalContributed - summary.equityTotals.totalDistributed) + "</td><td></td></tr></tbody></table>";
+
+    html += '<div class="auto-split"><h3>Adjust member draws — split a distribution across all members</h3>' +
+      '<div class="auto-split__controls">' +
+      '<label>Date<input type="date" id="splitDate" value="' + new Date().toISOString().slice(0, 10) + '" /></label>' +
+      '<label>Total amount<input type="number" id="splitAmount" placeholder="0.00" /></label>' +
+      '<button class="secondary-button" id="splitBtn">Split by ownership %</button>' +
+      "</div></div>";
+
+    wrap.innerHTML = html;
+    el.appendChild(wrap);
+    wireCapTableEvents(wrap, summary);
+  }
+
+  function ledgerHtml(member) {
+    var html = '<div class="ledger"><div class="ledger__column"><h4>Contributions</h4><table class="mini-table"><tbody>';
+    member.contributions.forEach(function (c) {
+      html += "<tr><td>" + fmtDate(c.date) + "</td><td>" + fmtMoney(c.amount, true) + "</td><td>" + esc(c.note || "") + '</td><td><button class="link-button" data-remove-contribution="' + member.id + "|" + c.id + '">remove</button></td></tr>';
+    });
+    html += '<tr><td><input type="date" data-new-contribution-date="' + member.id + '" /></td><td><input type="number" placeholder="0.00" data-new-contribution-amount="' + member.id + '" /></td>' +
+      '<td colspan="2"><button class="link-button" data-add-contribution="' + member.id + '">add</button></td></tr></tbody></table></div>';
+    html += '<div class="ledger__column"><h4>Distributions (draws)</h4><table class="mini-table"><tbody>';
+    member.distributions.forEach(function (d) {
+      html += "<tr><td>" + fmtDate(d.date) + "</td><td>" + fmtMoney(d.amount, true) + "</td><td>" + esc(d.note || "") + '</td><td><button class="link-button" data-remove-distribution="' + member.id + "|" + d.id + '">remove</button></td></tr>';
+    });
+    html += '<tr><td><input type="date" data-new-distribution-date="' + member.id + '" /></td><td><input type="number" placeholder="0.00" data-new-distribution-amount="' + member.id + '" /></td>' +
+      '<td colspan="2"><button class="link-button" data-add-distribution="' + member.id + '">add</button></td></tr></tbody></table></div></div>';
+    return html;
+  }
+
+  function findMember(id) { return project.capTable.filter(function (m) { return m.id === id; })[0]; }
+
+  function wireCapTableEvents(root, summary) {
+    root.querySelectorAll("[data-member-field]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var member = findMember(input.getAttribute("data-member-id"));
+        var field = input.getAttribute("data-member-field");
+        if (field === "ownershipPercent") member[field] = input.value === "" ? null : Number(input.value);
+        else member[field] = input.value;
+        render();
+        persist();
+      });
+    });
+    root.querySelectorAll("[data-member-delete]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-member-delete");
+        var m = findMember(id);
+        if (confirm('Remove "' + m.name + '" from the cap table?')) {
+          project.capTable = project.capTable.filter(function (x) { return x.id !== id; });
+          render();
+          persist();
+        }
+      });
+    });
+    root.querySelectorAll("[data-toggle-ledger]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-toggle-ledger");
+        expandedMemberId = expandedMemberId === id ? null : id;
+        render();
+      });
+    });
+    var addMemberBtn = root.querySelector("#addMemberBtn");
+    if (addMemberBtn) addMemberBtn.addEventListener("click", function () {
+      project.capTable.push({ id: genId("member"), name: "Member " + (project.capTable.length + 1), role: "LP", ownershipPercent: null, sortOrder: project.capTable.length, contributions: [], distributions: [] });
+      render();
+      persist();
+    });
+    root.querySelectorAll("[data-add-contribution]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-add-contribution");
+        var dateInput = root.querySelector('[data-new-contribution-date="' + id + '"]');
+        var amountInput = root.querySelector('[data-new-contribution-amount="' + id + '"]');
+        if (!amountInput.value) return;
+        findMember(id).contributions.push({ id: genId("contrib"), date: dateInput.value || new Date().toISOString().slice(0, 10), amount: Number(amountInput.value), note: "" });
+        render();
+        persist();
+      });
+    });
+    root.querySelectorAll("[data-remove-contribution]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var parts = btn.getAttribute("data-remove-contribution").split("|");
+        var m = findMember(parts[0]);
+        m.contributions = m.contributions.filter(function (c) { return c.id !== parts[1]; });
+        render();
+        persist();
+      });
+    });
+    root.querySelectorAll("[data-add-distribution]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-add-distribution");
+        var dateInput = root.querySelector('[data-new-distribution-date="' + id + '"]');
+        var amountInput = root.querySelector('[data-new-distribution-amount="' + id + '"]');
+        if (!amountInput.value) return;
+        findMember(id).distributions.push({ id: genId("dist"), date: dateInput.value || new Date().toISOString().slice(0, 10), amount: Number(amountInput.value), note: "" });
+        render();
+        persist();
+      });
+    });
+    root.querySelectorAll("[data-remove-distribution]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var parts = btn.getAttribute("data-remove-distribution").split("|");
+        var m = findMember(parts[0]);
+        m.distributions = m.distributions.filter(function (d) { return d.id !== parts[1]; });
+        render();
+        persist();
+      });
+    });
+    var splitBtn = root.querySelector("#splitBtn");
+    if (splitBtn) splitBtn.addEventListener("click", function () {
+      var date = root.querySelector("#splitDate").value;
+      var amount = Number(root.querySelector("#splitAmount").value);
+      if (!amount || amount <= 0) return;
+      var splits = autoSplitAmount(summary.capTable, amount);
+      splits.forEach(function (s) {
+        if (s.amount === 0) return;
+        findMember(s.memberId).distributions.push({ id: genId("dist"), date: date, amount: s.amount, note: "Auto-split distribution" });
+      });
+      render();
+      persist();
+    });
+  }
+
+  // ---------- theme toggle ----------
+  document.getElementById("themeToggle").addEventListener("click", function () {
+    var root = document.documentElement;
+    var current = root.getAttribute("data-theme");
+    var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    var effectiveIsDark = current ? current === "dark" : prefersDark;
+    root.setAttribute("data-theme", effectiveIsDark ? "light" : "dark");
+  });
+
+  boot();
+})();
+</script>
+</body>
+</html>

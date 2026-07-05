@@ -20,6 +20,18 @@ Lets you:
 - View a computed **monthly cashflow summary** (spreadsheet-style grid, by
   category and line item) plus a chart of total monthly cashflow.
 
+There are two ways to run this tool — pick one:
+
+| | `frontend/` (this doc) | [`apps-script/`](./apps-script/README.md) |
+|---|---|---|
+| Hosting | GitHub Pages | `script.google.com` (Google-hosted) |
+| Setup | Create an OAuth Client ID, enable GitHub Pages | Paste 3 files into the Apps Script editor |
+| Sign-in | Google sign-in per visitor | None — runs as whoever deployed it |
+| Best for | Sharing a URL with others who each use their own Google account | Fastest personal setup, or sharing one shared dataset |
+
+The rest of this document covers the GitHub Pages version. See
+[`apps-script/README.md`](./apps-script/README.md) for the Apps Script setup.
+
 ## Stack
 
 - **Frontend only**: React, TypeScript, Vite, TanStack Query, Recharts.
