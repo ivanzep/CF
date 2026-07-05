@@ -122,6 +122,11 @@ export function useProjectMutations(projectId: string | undefined) {
     onSuccess: invalidate,
   });
 
+  const loadExampleData = useMutation({
+    mutationFn: () => api.loadExampleData(projectId as string),
+    onSuccess: invalidate,
+  });
+
   return {
     updateProject,
     createCategory,
@@ -142,5 +147,6 @@ export function useProjectMutations(projectId: string | undefined) {
     createDistribution,
     deleteDistribution,
     autoSplitDistribution,
+    loadExampleData,
   };
 }

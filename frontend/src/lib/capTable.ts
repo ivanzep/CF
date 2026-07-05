@@ -1,24 +1,14 @@
-interface MemberWithRelations {
-  id: string;
-  name: string;
-  role: string;
-  ownershipPercent: number | null;
-  contributions: { amount: number }[];
-  distributions: { amount: number }[];
+import type { CapTableMember, CapTableRow } from "../types";
+
+function sum(values: number[]): number {
+  return values.reduce((a, b) => a + b, 0);
 }
 
-export interface CapTableRow {
-  id: string;
-  name: string;
-  role: string;
-  totalContributed: number;
-  totalDistributed: number;
-  netPosition: number;
-  ownershipPercent: number;
-  ownershipIsManual: boolean;
+function round(n: number): number {
+  return Math.round(n * 10000) / 10000;
 }
 
-export function computeCapTable(members: MemberWithRelations[]): CapTableRow[] {
+export function computeCapTable(members: CapTableMember[]): CapTableRow[] {
   const totals = members.map((m) => ({
     member: m,
     totalContributed: sum(m.contributions.map((c) => c.amount)),
@@ -66,17 +56,9 @@ export function autoSplitAmount(
   return rows.map((r, i) => {
     const isLast = i === rows.length - 1;
     const amount = isLast
-      ? round(totalAmount - allocated)
-      : round((r.ownershipPercent / totalPercent) * totalAmount);
+      ? Math.round((totalAmount - allocated) * 100) / 100
+      : Math.round((r.ownershipPercent / totalPercent) * totalAmount * 100) / 100;
     allocated += amount;
     return { memberId: r.id, amount };
   });
-}
-
-function sum(values: number[]): number {
-  return values.reduce((a, b) => a + b, 0);
-}
-
-function round(n: number): number {
-  return Math.round(n * 10000) / 10000;
 }

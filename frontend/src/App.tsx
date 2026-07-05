@@ -15,6 +15,7 @@ function App() {
   const { data: projects, isLoading: projectsLoading } = useProjects();
   const [projectId, setProjectId] = useState<string | undefined>(undefined);
   const [tab, setTab] = useState<Tab>("summary");
+  const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
     if (!projectId && projects && projects.length > 0) setProjectId(projects[0].id);
@@ -23,10 +24,33 @@ function App() {
   const { data: project, isLoading: projectLoading } = useProject(projectId);
   const { data: summary } = useSummary(projectId);
 
-  async function createProject() {
-    const created = await api.createProject({ name: "New Project" });
+  function invalidateAfterCreate(id: string) {
     qc.invalidateQueries({ queryKey: ["projects"] });
-    setProjectId(created.id);
+    qc.invalidateQueries({ queryKey: ["project", id] });
+    qc.invalidateQueries({ queryKey: ["summary", id] });
+  }
+
+  async function createProject() {
+    setBusy("Creating spreadsheet…");
+    try {
+      const created = await api.createProject({ name: "New Project" });
+      invalidateAfterCreate(created.id);
+      setProjectId(created.id);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function createExampleProject() {
+    setBusy("Creating example project…");
+    try {
+      const created = await api.createProject({ name: "La Costa Hotel" });
+      await api.loadExampleData(created.id);
+      invalidateAfterCreate(created.id);
+      setProjectId(created.id);
+    } finally {
+      setBusy(null);
+    }
   }
 
   if (projectsLoading) return <div className="app-loading">Loading…</div>;
@@ -35,10 +59,16 @@ function App() {
     return (
       <div className="app-empty">
         <h1>Cashflow Tracker</h1>
-        <p>No projects yet.</p>
-        <button className="secondary-button" onClick={createProject}>
-          + create project
-        </button>
+        <p>No projects yet. Each project is its own Google Sheet in your Drive.</p>
+        <div className="app-empty__actions">
+          <button className="secondary-button" disabled={!!busy} onClick={createProject}>
+            + create blank project
+          </button>
+          <button className="secondary-button" disabled={!!busy} onClick={createExampleProject}>
+            + load La Costa Hotel example
+          </button>
+        </div>
+        {busy && <p className="app-empty__busy">{busy}</p>}
       </div>
     );
   }
@@ -56,9 +86,10 @@ function App() {
             ))}
           </select>
         )}
-        <button className="link-button" onClick={createProject}>
+        <button className="link-button" disabled={!!busy} onClick={createProject}>
           + new project
         </button>
+        {busy && <span className="app-topbar__busy">{busy}</span>}
       </header>
 
       {projectLoading || !project ? (
