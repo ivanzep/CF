@@ -1,34 +1,54 @@
-# Cashflow Tracker — single-file static version
+# Static pages (no build step)
 
-A single, self-contained `index.html` — no build step, no npm install. It
-has the same features as `frontend/` (editable line items with even-spread
-or custom-date schedules, draws, cap table with auto-split, monthly
-summary), storing data in a Google Sheet your browser talks to directly.
+Two self-contained HTML pages live here — pick whichever backend you want:
 
-## Enabling it on GitHub Pages
+| | `index.html` | `apps-script.html` |
+|---|---|---|
+| Backend | Google Sheets API directly | A Google Apps Script web app ([`apps-script/`](../apps-script/README.md)) |
+| Setup | Google Cloud OAuth Client ID | Paste your Apps Script's `/exec` URL — no Cloud Console |
+| Sign-in | Google sign-in per visitor | None |
 
-This repo already has a GitHub Actions workflow that deploys the built
-`frontend/` React app to Pages. A Pages site can only have **one** active
-source, so pick whichever you want live:
+Both have the same features (editable line items with even-spread or
+custom-date schedules, draws, cap table with auto-split, monthly summary),
+no build step, no npm install.
 
-- **This single file** → repo **Settings → Pages → Build and deployment →
-  Source: Deploy from a branch**, branch `main`, folder `/docs`. No CI run
-  needed — it's live within a minute of enabling it, and stays live as long
-  as `docs/index.html` exists on `main`.
-- **The React app** → **Source: GitHub Actions** (already configured via
-  `.github/workflows/deploy-pages.yml`).
+## `apps-script.html` — no Google Cloud setup
 
-Either way, the URL is the same: `https://<your-username>.github.io/CF/`.
+Talks to a Google Apps Script web app over plain HTTP instead of calling
+Google Sheets directly, so there's no OAuth Client ID to create. Set up the
+backend first by following [`apps-script/README.md`](../apps-script/README.md),
+then open this page, paste the deployed `/exec` URL into **Connect your
+Apps Script backend**, and click **Connect**. Because access to that
+backend is intentionally open (no visitor sign-in), read
+[`apps-script/README.md`'s Security section](../apps-script/README.md#security)
+before sharing the URL.
 
-## Setup
+## `index.html` — direct Google Sheets + your own sign-in
 
-Same one-time Google Cloud OAuth Client ID as the React app — see the root
-[README](../README.md#one-time-setup-google-oauth-client-id) for the exact
-steps. Use the same **Authorized JavaScript origins** entry
-(`https://<your-username>.github.io`); one Client ID works for both
-versions since they're served from the same origin.
+Same one-time Google Cloud OAuth Client ID as the `frontend/` React app —
+see the root [README](../README.md#one-time-setup-google-oauth-client-id)
+for the exact steps. Use the same **Authorized JavaScript origins** entry
+(`https://<your-username>.github.io`); one Client ID works for both since
+they're served from the same origin.
 
 Open the page, paste the Client ID, sign in, then either start a blank
 project or load the bundled La Costa Hotel example — each project is its
 own spreadsheet, and you can create/switch between several from the
 dropdown in the top bar.
+
+## Enabling either on GitHub Pages
+
+This repo also has a GitHub Actions workflow that deploys the built
+`frontend/` React app to Pages. A Pages site can only have **one** active
+source, so pick whichever you want live:
+
+- **Either file in this folder** → repo **Settings → Pages → Build and
+  deployment → Source: Deploy from a branch**, branch `main`, folder
+  `/docs`. No CI run needed — live within a minute, and both
+  `index.html` and `apps-script.html` are served together (at `/` and
+  `/apps-script.html`) since they're just two pages of the same static
+  site.
+- **The React app** → **Source: GitHub Actions** (already configured via
+  `.github/workflows/deploy-pages.yml`).
+
+Either way, the base URL is `https://<your-username>.github.io/CF/`.

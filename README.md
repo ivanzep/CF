@@ -20,21 +20,31 @@ Lets you:
 - View a computed **monthly cashflow summary** (spreadsheet-style grid, by
   category and line item) plus a chart of total monthly cashflow.
 
-There are three ways to run this tool — pick one:
+There are four ways to run this tool — pick one:
 
-| | `frontend/` (this doc) | [`docs/`](./docs/README.md) | [`apps-script/`](./apps-script/README.md) |
-|---|---|---|---|
-| Hosting | GitHub Pages (via Actions build) | GitHub Pages (no build) | `script.google.com` (Google-hosted) |
-| Setup | Create an OAuth Client ID, enable GitHub Pages | Same OAuth Client ID, enable GitHub Pages (branch source) | Paste 3 files into the Apps Script editor |
-| Sign-in | Google sign-in per visitor | Google sign-in per visitor | None — runs as whoever deployed it |
-| Best for | The React codebase, if you want to keep developing it | Same experience with zero build step — one static file | Fastest personal setup, or sharing one shared dataset |
+| | `frontend/` (this doc) | [`docs/index.html`](./docs/README.md) | [`docs/apps-script.html`](./docs/README.md) | [`apps-script/`](./apps-script/README.md) |
+|---|---|---|---|---|
+| Data lives in | Google Sheets, via its API | Google Sheets, via its API | Google Sheets, via an Apps Script web app | Google Sheets, via an Apps Script web app |
+| Google Cloud Console needed? | Yes (OAuth Client ID) | Yes (OAuth Client ID) | **No** | **No** |
+| Hosting | GitHub Pages (via Actions build) | GitHub Pages (no build) | Anywhere static (e.g. GitHub Pages) | `script.google.com` only |
+| Sign-in | Google sign-in per visitor | Google sign-in per visitor | None | None |
+| Best for | The React codebase, if you want to keep developing it | Same experience, zero build step | No Cloud Console, UI hosted separately from the sheet | No Cloud Console, simplest possible setup |
 
-`frontend/` and `docs/` are the same app, built two different ways — a
-Pages site can only run one of them at a time (pick the source in repo
-Settings → Pages). The rest of this document covers the React/`frontend/`
-version. See [`docs/README.md`](./docs/README.md) for the single-file
-version, or [`apps-script/README.md`](./apps-script/README.md) for the
-Apps Script setup.
+`frontend/` and `docs/index.html` are the same OAuth-based app, built two
+different ways. `docs/apps-script.html` is a separate static UI that talks
+to the `apps-script/` backend over plain HTTP instead of calling Google
+Sheets directly — no OAuth Client ID at all, at the cost of the backend
+needing to allow unauthenticated requests (see
+[`apps-script/README.md`'s Security section](./apps-script/README.md#security)).
+A GitHub Pages site can only run one *source* at a time (pick it in repo
+Settings → Pages) but `docs/index.html` and `docs/apps-script.html` can
+both be served from that same `/docs` source.
+
+The rest of this document covers the React/`frontend/` version. See
+[`docs/README.md`](./docs/README.md) for the static pages, or
+[`apps-script/README.md`](./apps-script/README.md) for the Apps Script
+backend setup (start there if you don't want to touch Google Cloud
+Console).
 
 ## Stack
 

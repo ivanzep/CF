@@ -207,10 +207,26 @@
     font-size: 12.5px; opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 50;
   }
   .toast--visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .setup-gate { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .setup-gate__card { max-width: 480px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 32px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 16px; }
+  .setup-gate__card h1 { font-size: 20px; margin: 0; }
+  .setup-gate__card p { color: var(--text-secondary); line-height: 1.5; margin: 0; font-size: 13px; }
+  .setup-gate__field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-muted); }
+  .setup-gate__field input { font-size: 12.5px; }
+  .setup-gate__error { color: var(--danger) !important; }
+  .signed-in-bar { display: flex; align-items: center; gap: 12px; justify-content: center; padding: 6px 24px; font-size: 11.5px; color: var(--text-muted); border-bottom: 1px solid var(--border); }
 </style>
 </head>
 <body>
 
+<div id="setupGate"></div>
+
+<div id="appRoot" style="display:none;">
+  <div class="signed-in-bar">
+    <span id="connectionLabel">Connected</span>
+    <button class="link-button" id="changeUrlBtn">change API URL</button>
+  </div>
 <div class="app">
   <header class="app-topbar">
     <span class="app-topbar__title">Cashflow Tracker</span>
@@ -223,6 +239,7 @@
 
   <nav class="tabs" id="tabs"></nav>
   <div id="tabContent"></div>
+</div>
 </div>
 
 <div class="chart-tooltip" id="chartTooltip"></div>
@@ -249,28 +266,58 @@
     showToast._t = setTimeout(function () { t.classList.remove("toast--visible"); }, 1800);
   }
 
+  // ================= Apps Script API client =================
+  var API_URL_KEY = "cf_apps_script_url";
+  var API_TOKEN_KEY = "cf_apps_script_token";
+  function getApiUrl() { return localStorage.getItem(API_URL_KEY); }
+  function setApiUrl(url) { localStorage.setItem(API_URL_KEY, url.trim()); }
+  function getApiToken() { return localStorage.getItem(API_TOKEN_KEY) || ""; }
+  function setApiToken(token) { localStorage.setItem(API_TOKEN_KEY, token.trim()); }
+  function clearApiUrl() { localStorage.removeItem(API_URL_KEY); localStorage.removeItem(API_TOKEN_KEY); }
+
+  function callApi(action, payload) {
+    var url = getApiUrl();
+    if (!url) return Promise.reject(new Error("No Apps Script Web App URL configured"));
+    var token = getApiToken();
+
+    if (action === "getProject") {
+      var getUrl = url + (url.indexOf("?") === -1 ? "?" : "&") + "action=getProject" + (token ? "&token=" + encodeURIComponent(token) : "");
+      return fetch(getUrl).then(handleApiResponse_);
+    }
+
+    var body = Object.assign({ action: action, token: token }, payload || {});
+    return fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, // avoids a CORS preflight the Apps Script endpoint can't answer
+      body: JSON.stringify(body),
+    }).then(handleApiResponse_);
+  }
+
+  function handleApiResponse_(res) {
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json().then(function (json) {
+      if (json && json.error) throw new Error(json.error);
+      return json;
+    });
+  }
+
   function persist() {
     showToast("Saving…");
-    google.script.run
-      .withSuccessHandler(function () { showToast("Saved"); })
-      .withFailureHandler(function (err) { showToast("Save failed: " + (err && err.message ? err.message : err)); })
-      .saveProject(project);
+    callApi("saveProject", { project: project }).then(function () { showToast("Saved"); }).catch(function (err) {
+      showToast("Save failed: " + err.message);
+    });
   }
 
   function boot() {
-    google.script.run
-      .withSuccessHandler(function (p) {
-        project = p;
-        var isEmpty = project.categories.length === 0 && project.lineItems.length === 0 &&
-          project.draws.length === 0 && project.capTable.length === 0;
-        if (isEmpty) renderEmptyState();
-        else render();
-      })
-      .withFailureHandler(function (err) {
-        document.getElementById("bootMessage").textContent =
-          "Failed to load: " + (err && err.message ? err.message : err);
-      })
-      .getProject();
+    callApi("getProject").then(function (p) {
+      project = p;
+      var isEmpty = project.categories.length === 0 && project.lineItems.length === 0 &&
+        project.draws.length === 0 && project.capTable.length === 0;
+      if (isEmpty) renderEmptyState();
+      else render();
+    }).catch(function (err) {
+      document.getElementById("bootMessage").textContent = "Failed to load: " + err.message;
+    });
   }
 
   function renderEmptyState() {
@@ -289,12 +336,47 @@
     document.getElementById("startBlankBtn").addEventListener("click", function () { render(); });
     document.getElementById("loadExampleBtn").addEventListener("click", function () {
       el.innerHTML = '<p class="section__intro">Loading example data…</p>';
-      google.script.run
-        .withSuccessHandler(function (p) { project = p; render(); })
-        .withFailureHandler(function (err) { alert("Failed to load example data: " + (err && err.message ? err.message : err)); })
-        .loadExampleData();
+      callApi("loadExampleData").then(function (p) { project = p; render(); }).catch(function (err) {
+        alert("Failed to load example data: " + err.message);
+      });
     });
   }
+
+  // ================= setup gate (API URL, not Google sign-in) =================
+  function showSetupGate() {
+    document.getElementById("appRoot").style.display = "none";
+    var el = document.getElementById("setupGate");
+    el.style.display = "";
+    el.innerHTML =
+      '<div class="setup-gate"><div class="setup-gate__card">' +
+        '<h1>Connect your Apps Script backend</h1>' +
+        '<p>Paste the Web App URL from your deployed Apps Script project (Deploy &rarr; Manage deployments &rarr; copy the URL ending in <code>/exec</code>). See the repo README for how to set that up.</p>' +
+        '<label class="setup-gate__field">Web App URL<input id="apiUrlInput" placeholder="https://script.google.com/macros/s/AKfycb.../exec" value="' + esc(getApiUrl() || "") + '" /></label>' +
+        '<label class="setup-gate__field">Shared token (optional, only if you set API_TOKEN)<input id="apiTokenInput" value="' + esc(getApiToken()) + '" /></label>' +
+        '<div id="setupError"></div>' +
+        '<button class="secondary-button" id="connectBtn">Connect</button>' +
+      '</div></div>';
+    document.getElementById("connectBtn").addEventListener("click", function () {
+      var urlVal = document.getElementById("apiUrlInput").value.trim();
+      var tokenVal = document.getElementById("apiTokenInput").value.trim();
+      if (!urlVal) return;
+      setApiUrl(urlVal);
+      setApiToken(tokenVal);
+      var btn = document.getElementById("connectBtn");
+      btn.disabled = true; btn.textContent = "Connecting…";
+      callApi("getProject").then(function () {
+        el.style.display = "none";
+        document.getElementById("appRoot").style.display = "";
+        document.getElementById("connectionLabel").textContent = "Connected: " + urlVal.slice(0, 48) + (urlVal.length > 48 ? "…" : "");
+        boot();
+      }).catch(function (err) {
+        btn.disabled = false; btn.textContent = "Connect";
+        document.getElementById("setupError").innerHTML = '<p class="setup-gate__error">' + esc(err.message) + '</p>';
+      });
+    });
+  }
+
+  document.getElementById("changeUrlBtn").addEventListener("click", function () { showSetupGate(); });
 
   // ---------- formatting ----------
   function fmtMoney(n, cents) {
@@ -1024,7 +1106,13 @@
     root.setAttribute("data-theme", effectiveIsDark ? "light" : "dark");
   });
 
-  boot();
+  if (getApiUrl()) {
+    document.getElementById("connectionLabel").textContent = "Connected: " + getApiUrl().slice(0, 48) + (getApiUrl().length > 48 ? "…" : "");
+    document.getElementById("appRoot").style.display = "";
+    boot();
+  } else {
+    showSetupGate();
+  }
 })();
 </script>
 </body>

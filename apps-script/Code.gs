@@ -1,11 +1,21 @@
 /**
- * Cashflow Tracker — Google Sheets–backed web app.
+ * Cashflow Tracker — Google Sheets–backed JSON API.
  *
  * Bind this script to a Google Sheet (Extensions > Apps Script), deploy it
- * as a web app (Deploy > New deployment > Web app), and open the resulting
- * URL. All data lives in tabs on the bound spreadsheet; this file is the
- * only server-side logic, everything else runs in Index.html in the
- * visitor's browser.
+ * as a web app (Deploy > New deployment > Web app, access: Anyone), and
+ * use the resulting /exec URL as the API endpoint for the static frontend
+ * in docs/apps-script.html (hosted separately, e.g. on GitHub Pages). All
+ * data lives in tabs on the bound spreadsheet.
+ *
+ * Endpoints (both accept an "action" — see handleAction_ for the list):
+ *   GET  {url}?action=getProject
+ *   POST {url}  body: {"action": "saveProject", "project": {...}}
+ *
+ * Optional protection: set a Script Property named API_TOKEN (Project
+ * Settings > Script Properties) and every request must then include a
+ * matching "token" parameter/field, or it's rejected. Leave it unset for
+ * no token check (anyone with the URL can read/write this sheet either way
+ * — the token only adds a shared-secret gate on top).
  */
 
 var TAB_SCHEMA = {
@@ -30,11 +40,49 @@ var DATE_COLUMNS = {
   Distributions: [3],
 };
 
-function doGet() {
+function doGet(e) {
   ensureSheetsExist_();
-  return HtmlService.createHtmlOutputFromFile("Index")
-    .setTitle("Cashflow Tracker")
-    .addMetaTag("viewport", "width=device-width, initial-scale=1");
+  var params = (e && e.parameter) || {};
+  return handleAction_(params.action || "getProject", params);
+}
+
+function doPost(e) {
+  ensureSheetsExist_();
+  var body;
+  try {
+    body = JSON.parse((e && e.postData && e.postData.contents) || "{}");
+  } catch (err) {
+    return jsonOutput_({ error: "Invalid JSON body" });
+  }
+  return handleAction_(body.action, body);
+}
+
+function handleAction_(action, payload) {
+  payload = payload || {};
+  if (!checkToken_(payload)) {
+    return jsonOutput_({ error: "Unauthorized: missing or incorrect token" });
+  }
+  try {
+    if (action === "getProject") return jsonOutput_(getProject());
+    if (action === "saveProject") {
+      saveProject(payload.project);
+      return jsonOutput_({ ok: true });
+    }
+    if (action === "loadExampleData") return jsonOutput_(loadExampleData());
+    return jsonOutput_({ error: "Unknown action: " + action });
+  } catch (err) {
+    return jsonOutput_({ error: String((err && err.message) || err) });
+  }
+}
+
+function checkToken_(payload) {
+  var required = PropertiesService.getScriptProperties().getProperty("API_TOKEN");
+  if (!required) return true;
+  return payload && payload.token === required;
+}
+
+function jsonOutput_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
 function genId_(prefix) {
