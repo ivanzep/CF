@@ -36,19 +36,16 @@ project or load the bundled La Costa Hotel example — each project is its
 own spreadsheet, and you can create/switch between several from the
 dropdown in the top bar.
 
-## Enabling either on GitHub Pages
+## Enabling on GitHub Pages
 
-This repo also has a GitHub Actions workflow that deploys the built
-`frontend/` React app to Pages. A Pages site can only have **one** active
-source, so pick whichever you want live:
+This repo's Pages source is **Settings → Pages → Build and deployment →
+Source: Deploy from a branch**, branch `main`, folder `/docs`. No CI run
+needed — live within a minute, and both `index.html` and `apps-script.html`
+are served together (at `/` and `/apps-script.html`) since they're just two
+pages of the same static site, at `https://<your-username>.github.io/CF/`.
 
-- **Either file in this folder** → repo **Settings → Pages → Build and
-  deployment → Source: Deploy from a branch**, branch `main`, folder
-  `/docs`. No CI run needed — live within a minute, and both
-  `index.html` and `apps-script.html` are served together (at `/` and
-  `/apps-script.html`) since they're just two pages of the same static
-  site.
-- **The React app** → **Source: GitHub Actions** (already configured via
-  `.github/workflows/deploy-pages.yml`).
-
-Either way, the base URL is `https://<your-username>.github.io/CF/`.
+A Pages site can only have **one** active source. If you instead want the
+`frontend/` React app live at this repo's Pages URL, see
+[the root README's Deploying section](../README.md#deploying) — switching
+to it means `index.html`/`apps-script.html` stop being reachable via Pages
+until you switch back.

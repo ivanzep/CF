@@ -26,7 +26,7 @@ There are four ways to run this tool — pick one:
 |---|---|---|---|---|
 | Data lives in | Google Sheets, via its API | Google Sheets, via its API | Google Sheets, via an Apps Script web app | Google Sheets, via an Apps Script web app |
 | Google Cloud Console needed? | Yes (OAuth Client ID) | Yes (OAuth Client ID) | **No** | **No** |
-| Hosting | GitHub Pages (via Actions build) | GitHub Pages (no build) | Anywhere static (e.g. GitHub Pages) | `script.google.com` only |
+| Hosting | Build locally (`npm run build`), host `dist/` anywhere static | GitHub Pages (no build) | Anywhere static (e.g. GitHub Pages) | `script.google.com` only |
 | Sign-in | Google sign-in per visitor | Google sign-in per visitor | None | None |
 | Best for | The React codebase, if you want to keep developing it | Same experience, zero build step | No Cloud Console, UI hosted separately from the sheet | No Cloud Console, simplest possible setup |
 
@@ -37,8 +37,9 @@ Sheets directly — no OAuth Client ID at all, at the cost of the backend
 needing to allow unauthenticated requests (see
 [`apps-script/README.md`'s Security section](./apps-script/README.md#security)).
 A GitHub Pages site can only run one *source* at a time (pick it in repo
-Settings → Pages) but `docs/index.html` and `docs/apps-script.html` can
-both be served from that same `/docs` source.
+Settings → Pages). This repo's Pages source is **Deploy from a branch**
+(`main`, `/docs`), which serves `docs/index.html` and `docs/apps-script.html`
+from that same source — `frontend/` is not auto-deployed (see below).
 
 The rest of this document covers the React/`frontend/` version. See
 [`docs/README.md`](./docs/README.md) for the static pages, or
@@ -53,7 +54,8 @@ Console).
   and reads/writes it via the Sheets API, authenticated with your own Google
   account (Google Identity Services, client-side OAuth). No backend, no
   Postgres, no Express.
-- **Hosting**: static files, deployed to GitHub Pages via GitHub Actions.
+- **Hosting**: static files (`npm run build` → `frontend/dist/`). Not
+  auto-deployed in this repo — see "Deploying" below.
 
 ## One-time setup: Google OAuth Client ID
 
@@ -98,20 +100,29 @@ npm run dev
 Open http://localhost:5173, paste your Client ID, sign in, and either start
 a blank project or load the bundled La Costa Hotel example data.
 
-## Deploying to GitHub Pages
+## Deploying
 
-A workflow at `.github/workflows/deploy-pages.yml` builds and deploys the
-`frontend/` app automatically on every push to `main`. To turn it on:
+This repo's live GitHub Pages site serves `docs/` (Settings → Pages →
+**Deploy from a branch**, `main` / `/docs`) — see
+[`docs/README.md`](./docs/README.md). `frontend/` is a separate React
+codebase that isn't auto-deployed here, since a Pages site can only run one
+deployment source at a time. To host this build somewhere:
 
-1. In this repo's GitHub settings, go to **Settings → Pages** and set
-   **Build and deployment → Source** to **GitHub Actions**.
-2. Push to `main` (or run the workflow manually from the **Actions** tab).
-3. Once it finishes, the app is live at
-   `https://<your-github-username>.github.io/CF/`.
+```sh
+cd frontend
+npm run build
+```
 
-Make sure that exact URL is one of the **Authorized JavaScript origins** on
-your OAuth Client ID (step 4 above), or sign-in will fail with a redirect
-error.
+This produces static files in `frontend/dist/` — upload them to any static
+host (Vercel, Netlify, S3, another GitHub Pages repo, etc.). If you'd rather
+use this React build *instead of* `docs/` as this repo's Pages site, switch
+**Settings → Pages → Source** to **GitHub Actions** and add a workflow that
+builds `frontend/` and uploads `frontend/dist` via `actions/deploy-pages`
+(and remove/disable the `/docs` source, since only one can be active).
+
+Whichever URL you land on, make sure it's one of the **Authorized JavaScript
+origins** on your OAuth Client ID (step 4 above), or sign-in will fail with a
+redirect error.
 
 ## How data is stored
 
