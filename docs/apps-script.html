@@ -225,27 +225,59 @@
 
   @media print {
     @page { size: landscape; margin: 12mm; }
-    body { background: #fff; }
+    body { background: #fff; font-size: calc(1em * var(--print-font-scale, 1)); }
+    body.print-grayscale { filter: grayscale(1); }
     button, select, .tabs, .app-topbar, .signed-in-bar { display: none !important; }
     .app, .section { max-width: none; }
     .summary-grid-wrap { overflow: visible !important; max-height: none !important; border: none; }
     .summary-grid th, .summary-grid__label, .summary-grid__budget { position: static !important; box-shadow: none !important; }
+    .summary-grid th, .summary-grid td { padding-top: var(--print-row-padding, 5px); padding-bottom: var(--print-row-padding, 5px); }
     .cashflow-chart, .summary-grid-wrap, .draws-summary { border: none; box-shadow: none; }
     tr { page-break-inside: avoid; }
+    .print-pages, .print-preview-bar { display: none !important; }
+    .print-preview-mode .print-real-content { display: block !important; }
   }
 
   /* On-screen print preview (mirrors the @media print rules above, live) */
-  .print-preview-bar { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 12px; background: var(--accent); color: #fff; padding: 10px 24px; }
+  .print-preview-bar { position: sticky; top: 0; z-index: 100; display: flex; flex-direction: column; gap: 8px; background: var(--accent); color: #fff; padding: 10px 24px; }
+  .print-preview-bar__row { display: flex; align-items: center; gap: 12px; }
+  .print-preview-bar__settings { flex-wrap: wrap; font-size: 11px; }
+  .print-preview-bar__settings label { display: flex; flex-direction: column; gap: 2px; opacity: 0.9; }
+  .print-preview-bar__settings select { font-size: 12px; padding: 3px 4px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.15); color: #fff; }
+  .print-preview-bar__settings select option { color: #0b0b0b; }
   .print-preview-bar__label { font-weight: 600; flex: 1; }
   .print-preview-bar button { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
   .print-preview-bar button:hover { background: rgba(255,255,255,0.25); }
-  .print-preview-mode { background: #fff; }
+  .print-preview-mode { background: #fff; font-size: calc(1em * var(--print-font-scale, 1)); }
+  .print-preview-mode.print-grayscale .print-pages { filter: grayscale(1); }
   .print-preview-mode .app-topbar, .print-preview-mode .tabs, .print-preview-mode .signed-in-bar { display: none !important; }
   .print-preview-mode .app, .print-preview-mode .section { max-width: none; }
   .print-preview-mode .summary-grid-wrap { overflow: visible !important; max-height: none !important; border: none; }
   .print-preview-mode .summary-grid th, .print-preview-mode .summary-grid__label, .print-preview-mode .summary-grid__budget { position: static !important; box-shadow: none !important; }
+  .print-preview-mode .summary-grid th, .print-preview-mode .summary-grid td { padding-top: var(--print-row-padding, 5px); padding-bottom: var(--print-row-padding, 5px); }
   .print-preview-mode .cashflow-chart, .print-preview-mode .summary-grid-wrap, .print-preview-mode .draws-summary { border: none; box-shadow: none; }
   .print-preview-mode tr { page-break-inside: avoid; }
+  .print-preview-mode .print-real-content { display: none !important; }
+
+  .print-pages { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 0 48px; background: var(--page); }
+  .print-pages__hint { color: var(--text-muted); font-size: 12px; margin: 0; }
+  .print-page { background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.18); position: relative; flex-shrink: 0; }
+  .print-page__viewport { overflow: hidden; position: relative; }
+  .print-page__content { position: absolute; top: 0; left: 0; }
+  .print-page__label { position: absolute; bottom: 4px; right: 8px; font-size: 10px; color: var(--text-muted); }
+
+  .recurring-draws { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 4px 16px; }
+  .recurring-draws__form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; padding: 4px 0 16px; }
+  .recurring-draws__form label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-muted); }
+  .recurring-draws__form input, .recurring-draws__form select { min-width: 140px; }
+  .recurring-draws__checkbox { flex-direction: row !important; align-items: center; gap: 6px !important; }
+  .recurring-draws__checkbox input { min-width: 0; }
+
+  .export-csv { position: relative; }
+  .export-csv__panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 50; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); padding: 14px 16px; width: 260px; display: flex; flex-direction: column; gap: 8px; }
+  .export-csv__title { margin: 0 0 2px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+  .export-csv__option { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .export-csv__actions { display: flex; justify-content: space-between; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -254,9 +286,54 @@
 
 <div id="appRoot" style="display:none;">
   <div class="print-preview-bar" id="printPreviewBar" style="display:none;">
-    <span class="print-preview-bar__label">Print Preview</span>
-    <button id="ppPrintBtn" type="button">Print</button>
-    <button id="ppExitBtn" type="button">Exit preview</button>
+    <div class="print-preview-bar__row">
+      <span class="print-preview-bar__label">Print Preview</span>
+      <button id="ppPrintBtn" type="button">Print</button>
+      <button id="ppExitBtn" type="button">Exit preview</button>
+    </div>
+    <div class="print-preview-bar__row print-preview-bar__settings">
+      <label>Page size
+        <select id="ppPageSize">
+          <option value="letter">Letter (8.5×11 in)</option>
+          <option value="a4">A4 (210×297 mm)</option>
+          <option value="legal">Legal (8.5×14 in)</option>
+          <option value="tabloid">Tabloid (11×17 in)</option>
+        </select>
+      </label>
+      <label>Orientation
+        <select id="ppOrientation">
+          <option value="portrait">Portrait</option>
+          <option value="landscape" selected>Landscape</option>
+        </select>
+      </label>
+      <label>Margins
+        <select id="ppMargin">
+          <option value="narrow">Narrow</option>
+          <option value="normal" selected>Normal</option>
+          <option value="wide">Wide</option>
+        </select>
+      </label>
+      <label>Font size
+        <select id="ppFontSize">
+          <option value="small">Small</option>
+          <option value="normal" selected>Normal</option>
+          <option value="large">Large</option>
+        </select>
+      </label>
+      <label>Row size
+        <select id="ppRowSize">
+          <option value="compact">Compact</option>
+          <option value="normal" selected>Normal</option>
+          <option value="spacious">Spacious</option>
+        </select>
+      </label>
+      <label>Color
+        <select id="ppColorMode">
+          <option value="color">Color</option>
+          <option value="grayscale">Grayscale</option>
+        </select>
+      </label>
+    </div>
   </div>
   <div class="signed-in-bar">
     <span id="connectionLabel">Connected</span>
@@ -266,6 +343,10 @@
   <header class="app-topbar">
     <span class="app-topbar__title">Cashflow Tracker</span>
     <div class="app-topbar__spacer"></div>
+    <div class="export-csv" id="exportCsvWrap">
+      <button class="link-button" id="exportCsvBtn" type="button">Export CSV</button>
+      <div class="export-csv__panel" id="exportCsvPanel" style="display:none;"></div>
+    </div>
     <button class="link-button" id="printBtn" type="button">Print Preview</button>
     <button class="theme-toggle" id="themeToggle" type="button">◐ Toggle theme</button>
   </header>
@@ -291,6 +372,9 @@
   var expandedLineItemId = null;
   var expandedMemberId = null;
   var chartCollapsed = false;
+  var showDrawGenerator = false;
+  var previewMode = false;
+  var printSettings = { pageSize: "letter", orientation: "landscape", margin: "normal", fontSize: "normal", rowSize: "normal", colorMode: "color" };
   var nextIdCounter = 1;
 
   function genId(prefix) { return prefix + "_" + (nextIdCounter++) + "_" + Math.random().toString(36).slice(2, 7); }
@@ -526,6 +610,110 @@
     }
     return buckets;
   }
+  function addMonths(iso, months) {
+    var p = iso.split("-").map(Number);
+    var totalMonth = p[0] * 12 + (p[1] - 1) + months;
+    var newYear = Math.floor(totalMonth / 12), newMonth = totalMonth % 12;
+    var daysInMonth = new Date(newYear, newMonth + 1, 0).getDate();
+    var day = Math.min(p[2], daysInMonth);
+    return newYear + "-" + String(newMonth + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+  }
+  function generateRecurringDraws(input) {
+    var amountEach = input.splitEvenly ? round2(input.totalAmount / input.count) : input.totalAmount;
+    var allocated = 0, draws = [];
+    for (var i = 0; i < input.count; i++) {
+      var isLast = i === input.count - 1;
+      var amount = input.splitEvenly ? (isLast ? round2(input.totalAmount - allocated) : amountEach) : amountEach;
+      allocated += amount;
+      draws.push({ name: input.namePrefix + " " + (input.startIndex + i), date: addMonths(input.startDate, i * input.intervalMonths), amount: amount, source: input.source });
+    }
+    return draws;
+  }
+
+  // ---------- print layout ----------
+  var PAGE_SIZES_IN = { letter: [8.5, 11], a4: [8.27, 11.69], legal: [8.5, 14], tabloid: [11, 17] };
+  var MARGINS_IN = { narrow: 0.25, normal: 0.5, wide: 1 };
+  var FONT_SCALE = { small: 0.85, normal: 1, large: 1.2 };
+  var ROW_PADDING_PX = { compact: 2, normal: 5, spacious: 9 };
+  function pageDimensionsPx(settings) {
+    var dims = PAGE_SIZES_IN[settings.pageSize].slice();
+    if (settings.orientation === "landscape") dims = [dims[1], dims[0]];
+    var marginIn = MARGINS_IN[settings.margin];
+    var DPI = 96;
+    return {
+      pageWidthPx: Math.round(dims[0] * DPI),
+      pageHeightPx: Math.round(dims[1] * DPI),
+      contentWidthPx: Math.round((dims[0] - marginIn * 2) * DPI),
+      contentHeightPx: Math.round((dims[1] - marginIn * 2) * DPI),
+      marginPx: Math.round(marginIn * DPI),
+    };
+  }
+  function pageCssSize(settings) {
+    if (settings.pageSize === "tabloid") return settings.orientation === "landscape" ? "17in 11in" : "11in 17in";
+    var names = { letter: "letter", a4: "A4", legal: "legal" };
+    return names[settings.pageSize] + " " + settings.orientation;
+  }
+  function marginCss(settings) { return MARGINS_IN[settings.margin] + "in"; }
+
+  function stripIds(node) {
+    if (node.removeAttribute) node.removeAttribute("id");
+    if (node.querySelectorAll) {
+      node.querySelectorAll("[id]").forEach(function (c) { c.removeAttribute("id"); });
+    }
+  }
+
+  function buildPrintPages(sourceEl, settings) {
+    var dims = pageDimensionsPx(settings);
+    var container = document.createElement("div");
+    container.className = "print-pages";
+    var hint = document.createElement("p");
+    hint.className = "print-pages__hint";
+    container.appendChild(hint);
+
+    var measureClone = sourceEl.cloneNode(true);
+    stripIds(measureClone);
+    measureClone.style.position = "absolute";
+    measureClone.style.visibility = "hidden";
+    measureClone.style.width = dims.contentWidthPx + "px";
+    measureClone.style.left = "-99999px";
+    document.body.appendChild(measureClone);
+    var totalHeight = measureClone.scrollHeight;
+    document.body.removeChild(measureClone);
+
+    var numPages = Math.max(1, Math.ceil(totalHeight / dims.contentHeightPx));
+    hint.textContent = numPages + " page" + (numPages > 1 ? "s" : "") + " at this page size — approximate; printed table headers repeat on every page automatically.";
+
+    for (var i = 0; i < numPages; i++) {
+      var pageDiv = document.createElement("div");
+      pageDiv.className = "print-page";
+      pageDiv.style.width = dims.pageWidthPx + "px";
+      pageDiv.style.height = dims.pageHeightPx + "px";
+
+      var viewport = document.createElement("div");
+      viewport.className = "print-page__viewport";
+      viewport.style.width = dims.contentWidthPx + "px";
+      viewport.style.height = dims.contentHeightPx + "px";
+      viewport.style.margin = dims.marginPx + "px";
+
+      var contentClone = sourceEl.cloneNode(true);
+      stripIds(contentClone);
+      contentClone.className += " print-page__content";
+      contentClone.style.width = dims.contentWidthPx + "px";
+      contentClone.style.transform = "translateY(-" + (i * dims.contentHeightPx) + "px)";
+
+      viewport.appendChild(contentClone);
+      pageDiv.appendChild(viewport);
+
+      var label = document.createElement("div");
+      label.className = "print-page__label";
+      label.textContent = "Page " + (i + 1) + " of " + numPages;
+      pageDiv.appendChild(label);
+
+      container.appendChild(pageDiv);
+    }
+    return container;
+  }
+
   function getLineItemSchedule(item) {
     if (item.scheduleMode === "CUSTOM") {
       return item.payments.slice().sort(function (a, b) { return a.date.localeCompare(b.date); })
@@ -617,6 +805,102 @@
         totalDistributed: sum(capTableRows.map(function (r) { return r.totalDistributed; })),
       },
     };
+  }
+
+  // ---------- CSV export ----------
+  var EXPORT_SECTION_LABELS = {
+    project: "Project info",
+    lineItems: "Line items",
+    draws: "Draws",
+    capTable: "Cap table",
+    summary: "Cash flow summary (monthly grid)",
+  };
+  var EXPORT_SECTION_ORDER = ["project", "lineItems", "draws", "capTable", "summary"];
+
+  function csvEscape(value) {
+    var s = value == null ? "" : String(value);
+    if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+  function toCsvRow(cells) { return cells.map(csvEscape).join(","); }
+  function money(n) { return Math.round(((n || 0) + Number.EPSILON) * 100) / 100; }
+
+  function buildProjectCsv(proj) {
+    return [
+      toCsvRow(["Field", "Value"]),
+      toCsvRow(["Name", proj.name]),
+      toCsvRow(["Client", proj.client]),
+      toCsvRow(["Address", proj.address]),
+      toCsvRow(["Description", proj.description]),
+      toCsvRow(["Date", proj.projectDate]),
+    ].join("\n");
+  }
+  function buildLineItemsCsv(proj) {
+    function catName(id) { var c = proj.categories.filter(function (x) { return x.id === id; })[0]; return c ? c.name : ""; }
+    var rows = [toCsvRow(["Category", "Code", "Description", "Budget", "Schedule Mode", "Start Date", "End Date", "Payment Date", "Payment Amount"])];
+    proj.lineItems.forEach(function (li) {
+      if (li.scheduleMode === "CUSTOM" && li.payments.length) {
+        li.payments.forEach(function (p) {
+          rows.push(toCsvRow([catName(li.categoryId), li.code, li.description, money(li.totalBudget), li.scheduleMode, "", "", p.date, money(p.amount)]));
+        });
+      } else {
+        rows.push(toCsvRow([catName(li.categoryId), li.code, li.description, money(li.totalBudget), li.scheduleMode, li.startDate, li.endDate, "", ""]));
+      }
+    });
+    return rows.join("\n");
+  }
+  function buildDrawsCsv(proj) {
+    var rows = [toCsvRow(["Name", "Date", "Amount", "Source"])];
+    proj.draws.forEach(function (d) { rows.push(toCsvRow([d.name, d.date, money(d.amount), d.source])); });
+    return rows.join("\n");
+  }
+  function buildCapTableCsv(proj) {
+    var rows = [toCsvRow(["Member", "Role", "Ownership %", "Type", "Date", "Amount", "Note"])];
+    proj.capTable.forEach(function (m) {
+      if (!m.contributions.length && !m.distributions.length) {
+        rows.push(toCsvRow([m.name, m.role, m.ownershipPercent, "", "", "", ""]));
+      }
+      m.contributions.forEach(function (c) { rows.push(toCsvRow([m.name, m.role, m.ownershipPercent, "Contribution", c.date, money(c.amount), c.note])); });
+      m.distributions.forEach(function (d) { rows.push(toCsvRow([m.name, m.role, m.ownershipPercent, "Distribution", d.date, money(d.amount), d.note])); });
+    });
+    return rows.join("\n");
+  }
+  function buildSummaryCsv(summary) {
+    var rows = [toCsvRow(["Line item", "Budget"].concat(summary.months))];
+    summary.categories.forEach(function (cat) {
+      rows.push(toCsvRow([cat.name, ""].concat(summary.months.map(function () { return ""; }))));
+      cat.lineItems.forEach(function (li) {
+        rows.push(toCsvRow([(li.code ? li.code + " " + li.description : li.description), money(li.totalBudget)]
+          .concat(summary.months.map(function (m) { return money(li.monthly[m]); }))));
+      });
+      rows.push(toCsvRow(["Total " + cat.name, money(cat.subtotalTotal)].concat(summary.months.map(function (m) { return money(cat.subtotal[m]); }))));
+    });
+    rows.push(toCsvRow(["Grand Total", money(summary.grandTotal.total)].concat(summary.months.map(function (m) { return money(summary.grandTotal.monthly[m]); }))));
+    return rows.join("\n");
+  }
+  function buildCombinedCsv(proj, summary, sections) {
+    var parts = [];
+    sections.forEach(function (s) {
+      parts.push("# " + EXPORT_SECTION_LABELS[s]);
+      if (s === "project") parts.push(buildProjectCsv(proj));
+      if (s === "lineItems") parts.push(buildLineItemsCsv(proj));
+      if (s === "draws") parts.push(buildDrawsCsv(proj));
+      if (s === "capTable") parts.push(buildCapTableCsv(proj));
+      if (s === "summary" && summary) parts.push(buildSummaryCsv(summary));
+      parts.push("");
+    });
+    return parts.join("\n");
+  }
+  function downloadCsv(filename, content) {
+    var blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   // ---------- render orchestration ----------
@@ -739,6 +1023,13 @@
     el.appendChild(wrap);
     var labelCell = gridWrap.querySelector(".summary-grid__label");
     if (labelCell) gridWrap.style.setProperty("--budget-col-left", labelCell.offsetWidth + "px");
+
+    if (previewMode) {
+      var pages = buildPrintPages(wrap, printSettings);
+      el.insertBefore(pages, wrap);
+      wrap.classList.add("print-real-content");
+    }
+
     document.getElementById("chartCollapseBtn").addEventListener("click", function () {
       chartCollapsed = !chartCollapsed;
       render();
@@ -1014,8 +1305,31 @@
     var wrap = document.createElement("div");
     wrap.className = "section";
     var total = sum(project.draws.map(function (d) { return d.amount; }));
-    var html = '<p class="section__intro">Define the draw structure for this project — construction loan draws, equity calls, or any other funding event. Each draw has a name, a date, and an amount you can edit freely.</p>' +
-      '<table class="line-items-table"><thead><tr><th>Draw</th><th class="col-date">Date</th><th class="col-money">Amount</th><th>Source</th><th class="col-actions"></th></tr></thead><tbody>';
+    var html = '<p class="section__intro">Define the draw structure for this project — construction loan draws, equity calls, or any other funding event. Each draw has a name, a date, and an amount you can edit freely.</p>';
+
+    html += '<div class="recurring-draws"><button class="link-button" id="toggleDrawGenBtn">' + (showDrawGenerator ? "▾" : "▸") + " generate recurring draws (e.g. quarterly)</button>";
+    if (showDrawGenerator) {
+      html += '<div class="recurring-draws__form">' +
+        '<label>Start date<input type="date" id="genStartDate" value="' + new Date().toISOString().slice(0, 10) + '" /></label>' +
+        '<label>Repeat<select id="genInterval">' +
+          '<option value="1">Monthly</option>' +
+          '<option value="3" selected>Quarterly (every 3 months)</option>' +
+          '<option value="6">Every 6 months</option>' +
+          '<option value="12">Annually</option>' +
+          '<option value="0">Custom</option>' +
+        "</select></label>" +
+        '<label id="genCustomMonthsWrap" style="display:none;">Every N months<input type="number" id="genCustomMonths" min="1" value="3" /></label>' +
+        '<label>Number of draws<input type="number" id="genCount" min="1" value="4" /></label>' +
+        '<label id="genAmountLabel">Total amount (split evenly)<input type="number" id="genTotalAmount" value="0" /></label>' +
+        '<label class="recurring-draws__checkbox"><input type="checkbox" id="genSplitEvenly" checked /> Split total evenly across draws</label>' +
+        '<label>Name prefix<input type="text" id="genNamePrefix" value="Draw" /></label>' +
+        '<label>Source<input type="text" id="genSource" placeholder="e.g. Construction Loan" /></label>' +
+        '<button class="secondary-button" id="genSubmitBtn">Generate</button>' +
+        "</div>";
+    }
+    html += "</div>";
+
+    html += '<table class="line-items-table"><thead><tr><th>Draw</th><th class="col-date">Date</th><th class="col-money">Amount</th><th>Source</th><th class="col-actions"></th></tr></thead><tbody>';
     project.draws.forEach(function (d) {
       html += "<tr>" +
         '<td><input class="editable-text" value="' + esc(d.name) + '" data-draw-field="name" data-draw-id="' + d.id + '" /></td>' +
@@ -1055,6 +1369,44 @@
       render();
       persist();
     });
+
+    wrap.querySelector("#toggleDrawGenBtn").addEventListener("click", function () {
+      showDrawGenerator = !showDrawGenerator;
+      render();
+    });
+    if (showDrawGenerator) {
+      var intervalSelect = wrap.querySelector("#genInterval");
+      var customWrap = wrap.querySelector("#genCustomMonthsWrap");
+      var splitCheckbox = wrap.querySelector("#genSplitEvenly");
+      var amountLabel = wrap.querySelector("#genAmountLabel");
+      function syncGenForm() {
+        customWrap.style.display = intervalSelect.value === "0" ? "" : "none";
+        amountLabel.firstChild.textContent = splitCheckbox.checked ? "Total amount (split evenly)" : "Amount per draw";
+      }
+      intervalSelect.addEventListener("change", syncGenForm);
+      splitCheckbox.addEventListener("change", syncGenForm);
+      wrap.querySelector("#genSubmitBtn").addEventListener("click", function () {
+        var intervalChoice = Number(intervalSelect.value);
+        var intervalMonths = intervalChoice === 0 ? Math.max(1, Number(wrap.querySelector("#genCustomMonths").value) || 1) : intervalChoice;
+        var count = Math.max(1, Number(wrap.querySelector("#genCount").value) || 1);
+        var entries = generateRecurringDraws({
+          startDate: wrap.querySelector("#genStartDate").value,
+          intervalMonths: intervalMonths,
+          count: count,
+          totalAmount: Number(wrap.querySelector("#genTotalAmount").value) || 0,
+          splitEvenly: splitCheckbox.checked,
+          namePrefix: wrap.querySelector("#genNamePrefix").value || "Draw",
+          source: wrap.querySelector("#genSource").value || "",
+          startIndex: project.draws.length + 1,
+        });
+        entries.forEach(function (e) {
+          project.draws.push({ id: genId("draw"), name: e.name, date: e.date, amount: e.amount, source: e.source, sortOrder: project.draws.length });
+        });
+        showDrawGenerator = false;
+        render();
+        persist();
+      });
+    }
   }
 
   // ---------- Cap Table ----------
@@ -1223,10 +1575,56 @@
     root.setAttribute("data-theme", effectiveIsDark ? "light" : "dark");
   });
 
+  // ---------- export csv ----------
+  var exportSections = { project: true, lineItems: true, draws: true, capTable: true, summary: true };
+  function renderExportPanel() {
+    var panel = document.getElementById("exportCsvPanel");
+    var html = '<p class="export-csv__title">Export sections</p>';
+    EXPORT_SECTION_ORDER.forEach(function (s) {
+      html += '<label class="export-csv__option"><input type="checkbox" data-export-section="' + s + '" ' + (exportSections[s] ? "checked" : "") + " />" + esc(EXPORT_SECTION_LABELS[s]) + "</label>";
+    });
+    html += '<div class="export-csv__actions"><button class="link-button" id="exportCancelBtn">Cancel</button><button class="secondary-button" id="exportDownloadBtn">Download CSV</button></div>';
+    panel.innerHTML = html;
+    panel.querySelectorAll("[data-export-section]").forEach(function (cb) {
+      cb.addEventListener("change", function () { exportSections[cb.getAttribute("data-export-section")] = cb.checked; });
+    });
+    panel.querySelector("#exportCancelBtn").addEventListener("click", function () { panel.style.display = "none"; });
+    panel.querySelector("#exportDownloadBtn").addEventListener("click", function () {
+      var sections = EXPORT_SECTION_ORDER.filter(function (s) { return exportSections[s]; });
+      var summary = buildSummary(project);
+      var csv = buildCombinedCsv(project, summary, sections);
+      var safeName = project.name.replace(/[^a-z0-9 -]/gi, "").trim() || "project";
+      downloadCsv(safeName + " - cashflow export.csv", csv);
+      panel.style.display = "none";
+    });
+  }
+  document.getElementById("exportCsvBtn").addEventListener("click", function () {
+    var panel = document.getElementById("exportCsvPanel");
+    var isOpen = panel.style.display !== "none";
+    if (isOpen) { panel.style.display = "none"; return; }
+    renderExportPanel();
+    panel.style.display = "flex";
+  });
+
   // ---------- print ----------
+  function applyPrintSettingsToDom() {
+    document.body.classList.toggle("print-grayscale", printSettings.colorMode === "grayscale");
+    document.body.style.setProperty("--print-font-scale", String(FONT_SCALE[printSettings.fontSize]));
+    document.body.style.setProperty("--print-row-padding", ROW_PADDING_PX[printSettings.rowSize] + "px");
+    var styleEl = document.getElementById("dynamic-print-page");
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = "dynamic-print-page";
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = "@page { size: " + pageCssSize(printSettings) + "; margin: " + marginCss(printSettings) + "; }";
+  }
   function setPreviewMode(on) {
+    previewMode = on;
     document.body.classList.toggle("print-preview-mode", on);
     document.getElementById("printPreviewBar").style.display = on ? "flex" : "none";
+    if (on) applyPrintSettingsToDom();
+    render();
   }
   document.getElementById("printBtn").addEventListener("click", function () {
     setPreviewMode(true);
@@ -1236,6 +1634,36 @@
   });
   document.getElementById("ppPrintBtn").addEventListener("click", function () {
     window.print();
+  });
+  document.getElementById("ppPageSize").addEventListener("change", function (e) {
+    printSettings.pageSize = e.target.value;
+    applyPrintSettingsToDom();
+    render();
+  });
+  document.getElementById("ppOrientation").addEventListener("change", function (e) {
+    printSettings.orientation = e.target.value;
+    applyPrintSettingsToDom();
+    render();
+  });
+  document.getElementById("ppMargin").addEventListener("change", function (e) {
+    printSettings.margin = e.target.value;
+    applyPrintSettingsToDom();
+    render();
+  });
+  document.getElementById("ppFontSize").addEventListener("change", function (e) {
+    printSettings.fontSize = e.target.value;
+    applyPrintSettingsToDom();
+    render();
+  });
+  document.getElementById("ppRowSize").addEventListener("change", function (e) {
+    printSettings.rowSize = e.target.value;
+    applyPrintSettingsToDom();
+    render();
+  });
+  document.getElementById("ppColorMode").addEventListener("change", function (e) {
+    printSettings.colorMode = e.target.value;
+    applyPrintSettingsToDom();
+    render();
   });
 
   if (getApiUrl()) {

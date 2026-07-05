@@ -12,13 +12,17 @@ Lets you:
 - Schedule each line item's payments either **spread evenly** between a start
   and end date, or on **specific custom dates**.
 - Define a project's **draw structure** (construction loan draws, equity
-  calls, etc.) with editable name/date/amount/source.
+  calls, etc.) with editable name/date/amount/source, or **auto-generate a
+  recurring series** (e.g. quarterly draws) over a date range.
 - Track a **cap table**: members' capital contributions, adjust their draws
   (distributions) individually or auto-split a distribution across all
   members by ownership %, with ownership computed pro-rata from
   contributions unless manually overridden.
 - View a computed **monthly cashflow summary** (spreadsheet-style grid, by
   category and line item) plus a chart of total monthly cashflow.
+- **Print preview** with page size/orientation/margin/font/row-size options
+  and a paginated on-screen preview, or **export a CSV** of any combination
+  of project info, line items, draws, cap table, and the summary grid.
 
 There are four ways to run this tool — pick one:
 

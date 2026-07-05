@@ -7,6 +7,20 @@ import { LineItemsSection } from "./components/LineItemsSection";
 import { CashflowSummarySection } from "./components/CashflowSummarySection";
 import { DrawsSection } from "./components/DrawsSection";
 import { CapTableSection } from "./components/CapTableSection";
+import { PrintPages } from "./components/PrintPages";
+import { ExportCsvButton } from "./components/ExportCsvButton";
+import {
+  DEFAULT_PRINT_SETTINGS,
+  FONT_SCALE,
+  MARGIN_LABELS,
+  FONT_SIZE_LABELS,
+  PAGE_SIZE_LABELS,
+  ROW_PADDING_PX,
+  ROW_SIZE_LABELS,
+  marginCss,
+  pageCssSize,
+  type PrintSettings,
+} from "./lib/printLayout";
 
 type Tab = "line-items" | "summary" | "draws" | "cap-table";
 
@@ -17,10 +31,27 @@ function App() {
   const [tab, setTab] = useState<Tab>("summary");
   const [busy, setBusy] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
+  const [printSettings, setPrintSettings] = useState<PrintSettings>(DEFAULT_PRINT_SETTINGS);
 
   useEffect(() => {
     document.body.classList.toggle("print-preview-mode", previewMode);
   }, [previewMode]);
+
+  useEffect(() => {
+    document.body.classList.toggle("print-grayscale", printSettings.colorMode === "grayscale");
+    document.body.style.setProperty("--print-font-scale", String(FONT_SCALE[printSettings.fontSize]));
+    document.body.style.setProperty("--print-row-padding", `${ROW_PADDING_PX[printSettings.rowSize]}px`);
+  }, [printSettings]);
+
+  useEffect(() => {
+    let styleEl = document.getElementById("dynamic-print-page") as HTMLStyleElement | null;
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = "dynamic-print-page";
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = `@page { size: ${pageCssSize(printSettings)}; margin: ${marginCss(printSettings)}; }`;
+  }, [printSettings]);
 
   useEffect(() => {
     if (!projectId && projects && projects.length > 0) setProjectId(projects[0].id);
@@ -82,9 +113,89 @@ function App() {
     <>
       {previewMode && (
         <div className="print-preview-bar">
-          <span className="print-preview-bar__label">Print Preview</span>
-          <button onClick={() => window.print()}>Print</button>
-          <button onClick={() => setPreviewMode(false)}>Exit preview</button>
+          <div className="print-preview-bar__row">
+            <span className="print-preview-bar__label">Print Preview</span>
+            <button onClick={() => window.print()}>Print</button>
+            <button onClick={() => setPreviewMode(false)}>Exit preview</button>
+          </div>
+          <div className="print-preview-bar__row print-preview-bar__settings">
+            <label>
+              Page size
+              <select
+                value={printSettings.pageSize}
+                onChange={(e) => setPrintSettings({ ...printSettings, pageSize: e.target.value as PrintSettings["pageSize"] })}
+              >
+                {Object.entries(PAGE_SIZE_LABELS).map(([k, label]) => (
+                  <option key={k} value={k}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Orientation
+              <select
+                value={printSettings.orientation}
+                onChange={(e) =>
+                  setPrintSettings({ ...printSettings, orientation: e.target.value as PrintSettings["orientation"] })
+                }
+              >
+                <option value="portrait">Portrait</option>
+                <option value="landscape">Landscape</option>
+              </select>
+            </label>
+            <label>
+              Margins
+              <select
+                value={printSettings.margin}
+                onChange={(e) => setPrintSettings({ ...printSettings, margin: e.target.value as PrintSettings["margin"] })}
+              >
+                {Object.entries(MARGIN_LABELS).map(([k, label]) => (
+                  <option key={k} value={k}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Font size
+              <select
+                value={printSettings.fontSize}
+                onChange={(e) => setPrintSettings({ ...printSettings, fontSize: e.target.value as PrintSettings["fontSize"] })}
+              >
+                {Object.entries(FONT_SIZE_LABELS).map(([k, label]) => (
+                  <option key={k} value={k}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Row size
+              <select
+                value={printSettings.rowSize}
+                onChange={(e) => setPrintSettings({ ...printSettings, rowSize: e.target.value as PrintSettings["rowSize"] })}
+              >
+                {Object.entries(ROW_SIZE_LABELS).map(([k, label]) => (
+                  <option key={k} value={k}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Color
+              <select
+                value={printSettings.colorMode}
+                onChange={(e) =>
+                  setPrintSettings({ ...printSettings, colorMode: e.target.value as PrintSettings["colorMode"] })
+                }
+              >
+                <option value="color">Color</option>
+                <option value="grayscale">Grayscale</option>
+              </select>
+            </label>
+          </div>
         </div>
       )}
       <div className="app">
@@ -103,6 +214,7 @@ function App() {
           + new project
         </button>
         {busy && <span className="app-topbar__busy">{busy}</span>}
+        {project && <ExportCsvButton project={project} summary={summary} />}
         <button className="link-button" onClick={() => setPreviewMode(true)}>
           Print Preview
         </button>
@@ -134,7 +246,18 @@ function App() {
             </button>
           </nav>
 
-          {tab === "summary" && summary && <CashflowSummarySection summary={summary} />}
+          {tab === "summary" && summary && (
+            <>
+              {previewMode && (
+                <PrintPages settings={printSettings}>
+                  <CashflowSummarySection summary={summary} />
+                </PrintPages>
+              )}
+              <div className="print-real-content">
+                <CashflowSummarySection summary={summary} />
+              </div>
+            </>
+          )}
           {tab === "line-items" && <LineItemsSection project={project} />}
           {tab === "draws" && <DrawsSection project={project} />}
           {tab === "cap-table" && summary && <CapTableSection project={project} summary={summary} />}

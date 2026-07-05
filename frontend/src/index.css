@@ -595,6 +595,88 @@ select:focus {
   color: var(--text-secondary);
 }
 
+/* Recurring draws generator */
+
+.recurring-draws {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 16px;
+}
+
+.recurring-draws__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 4px 0 16px;
+}
+
+.recurring-draws__form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.recurring-draws__form input,
+.recurring-draws__form select {
+  min-width: 140px;
+}
+
+.recurring-draws__checkbox {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px !important;
+}
+
+.recurring-draws__checkbox input {
+  min-width: 0;
+}
+
+/* Export CSV */
+
+.export-csv {
+  position: relative;
+}
+
+.export-csv__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.export-csv__title {
+  margin: 0 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.export-csv__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.export-csv__actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
 /* Cap table */
 
 .auto-split {
@@ -702,11 +784,42 @@ select:focus {
   top: 0;
   z-index: 100;
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
   background: var(--accent);
   color: #fff;
   padding: 10px 24px;
+}
+
+.print-preview-bar__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.print-preview-bar__settings {
+  flex-wrap: wrap;
+  font-size: 11px;
+}
+
+.print-preview-bar__settings label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0.9;
+}
+
+.print-preview-bar__settings select {
+  font-size: 12px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.print-preview-bar__settings select option {
+  color: #0b0b0b;
 }
 
 .print-preview-bar__label {
@@ -729,6 +842,11 @@ select:focus {
 
 .print-preview-mode {
   background: #fff;
+  font-size: calc(1em * var(--print-font-scale, 1));
+}
+
+.print-preview-mode.print-grayscale .print-pages {
+  filter: grayscale(1);
 }
 
 .print-preview-mode .app-topbar,
@@ -755,6 +873,12 @@ select:focus {
   box-shadow: none !important;
 }
 
+.print-preview-mode .summary-grid th,
+.print-preview-mode .summary-grid td {
+  padding-top: var(--print-row-padding, 5px);
+  padding-bottom: var(--print-row-padding, 5px);
+}
+
 .print-preview-mode .cashflow-chart,
 .print-preview-mode .summary-grid-wrap,
 .print-preview-mode .draws-summary {
@@ -764,4 +888,80 @@ select:focus {
 
 .print-preview-mode tr {
   page-break-inside: avoid;
+}
+
+/* Paginated preview boxes */
+
+.print-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 24px 0 48px;
+  background: var(--page);
+}
+
+.print-pages__hint {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin: 0;
+}
+
+.print-page {
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.print-page__viewport {
+  overflow: hidden;
+  position: relative;
+}
+
+.print-page__content {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.print-page__label {
+  position: absolute;
+  bottom: 4px;
+  right: 8px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* The paginated boxes above are an on-screen approximation only. Actual
+   printing uses the flat, un-clipped content so the browser's native
+   pagination and <thead> repeat-per-page behavior do the real work. */
+
+.print-preview-mode .print-real-content {
+  display: none !important;
+}
+
+@media print {
+  body {
+    font-size: calc(1em * var(--print-font-scale, 1));
+  }
+
+  body.print-grayscale {
+    filter: grayscale(1);
+  }
+
+  .summary-grid th,
+  .summary-grid td {
+    padding-top: var(--print-row-padding, 5px);
+    padding-bottom: var(--print-row-padding, 5px);
+  }
+
+  .print-pages,
+  .print-preview-bar {
+    display: none !important;
+  }
+
+  .print-preview-mode .print-real-content {
+    display: block !important;
+  }
 }

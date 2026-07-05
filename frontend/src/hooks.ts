@@ -74,6 +74,11 @@ export function useProjectMutations(projectId: string | undefined) {
     mutationFn: (data: Partial<Draw>) => api.createDraw(projectId as string, data),
     onSuccess: invalidate,
   });
+  const createDraws = useMutation({
+    mutationFn: (entries: { name: string; date: string; amount: number; source: string | null }[]) =>
+      api.createDraws(projectId as string, entries),
+    onSuccess: invalidate,
+  });
   const updateDraw = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Draw> }) => api.updateDraw(id, data),
     onSuccess: invalidate,
@@ -137,6 +142,7 @@ export function useProjectMutations(projectId: string | undefined) {
     deleteLineItem,
     setLineItemPayments,
     createDraw,
+    createDraws,
     updateDraw,
     deleteDraw,
     createMember,

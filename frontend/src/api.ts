@@ -162,6 +162,23 @@ export const api = {
     await persist(["Draws"]);
     return draw;
   },
+  createDraws: async (
+    projectId: string,
+    entries: { name: string; date: string; amount: number; source: string | null }[]
+  ): Promise<Draw[]> => {
+    const { project } = requireCache(projectId);
+    const draws: Draw[] = entries.map((data, i) => ({
+      id: genId("draw"),
+      name: data.name,
+      date: data.date,
+      amount: data.amount,
+      source: data.source,
+      sortOrder: project.draws.length + i,
+    }));
+    project.draws.push(...draws);
+    await persist(["Draws"]);
+    return draws;
+  },
   updateDraw: async (id: string, data: Partial<Draw>): Promise<Draw> => {
     const { project } = requireCache();
     const d = project.draws.find((x) => x.id === id);
