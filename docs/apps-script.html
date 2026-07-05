@@ -59,6 +59,22 @@
     }
   }
 
+  /* Accent color alternatives */
+  :root[data-accent="green"] { --accent: #2e9e5b; --accent-bg: rgba(46, 158, 91, 0.1); }
+  :root[data-accent="purple"] { --accent: #7c5cff; --accent-bg: rgba(124, 92, 255, 0.1); }
+  :root[data-accent="orange"] { --accent: #c8720a; --accent-bg: rgba(200, 114, 10, 0.1); }
+  :root[data-accent="rose"] { --accent: #c23b6b; --accent-bg: rgba(194, 59, 107, 0.1); }
+  :root[data-theme="dark"][data-accent="green"] { --accent: #3fc178; --accent-bg: rgba(63, 193, 120, 0.15); }
+  :root[data-theme="dark"][data-accent="purple"] { --accent: #9277ff; --accent-bg: rgba(146, 119, 255, 0.15); }
+  :root[data-theme="dark"][data-accent="orange"] { --accent: #e08a2b; --accent-bg: rgba(224, 138, 43, 0.15); }
+  :root[data-theme="dark"][data-accent="rose"] { --accent: #e35a8c; --accent-bg: rgba(227, 90, 140, 0.15); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"])[data-accent="green"] { --accent: #3fc178; --accent-bg: rgba(63, 193, 120, 0.15); }
+    :root:not([data-theme="light"])[data-accent="purple"] { --accent: #9277ff; --accent-bg: rgba(146, 119, 255, 0.15); }
+    :root:not([data-theme="light"])[data-accent="orange"] { --accent: #e08a2b; --accent-bg: rgba(224, 138, 43, 0.15); }
+    :root:not([data-theme="light"])[data-accent="rose"] { --accent: #e35a8c; --accent-bg: rgba(227, 90, 140, 0.15); }
+  }
+
   * { box-sizing: border-box; }
   html, body { margin: 0; }
   body {
@@ -93,19 +109,18 @@
 
   .app { max-width: 1400px; margin: 0 auto; padding: 0 24px 64px; }
 
-  .app-topbar { display: flex; align-items: center; gap: 16px; padding: 20px 0; }
-  .app-topbar__title { font-weight: 700; font-size: 18px; letter-spacing: -0.01em; }
+  .app-topbar { display: flex; align-items: center; gap: 16px; padding: 10px 0; }
+  .app-topbar__title { font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
   .app-topbar__spacer { flex: 1; }
-  .theme-toggle {
-    background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px;
-    padding: 5px 10px; cursor: pointer; color: var(--text-secondary);
-  }
 
   .project-header {
     background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
     padding: 20px 24px; margin-bottom: 16px; box-shadow: var(--shadow);
   }
-  .project-header__name { font-size: 22px; font-weight: 700; margin-bottom: 12px; }
+  .project-header--collapsed { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; }
+  .project-header__collapsed-name { font-size: 16px; font-weight: 600; }
+  .project-header__top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .project-header__name { font-size: 22px; font-weight: 700; margin-bottom: 0; width: auto; flex: 1; }
   .project-header__meta { display: flex; gap: 32px; flex-wrap: wrap; font-size: 12px; color: var(--text-muted); }
   .project-header__meta b { display: block; color: var(--text-secondary); font-weight: 500; font-size: 13px; margin-top: 2px; }
 
@@ -184,6 +199,11 @@
   .summary-grid__category td.summary-grid__label, .summary-grid__category td.summary-grid__budget { background: var(--page); }
   .summary-grid__subtotal td { font-weight: 600; border-top: 1px solid var(--border-strong); }
   .summary-grid__grandtotal td { font-weight: 700; border-top: 2px solid var(--border-strong); font-size: 13.5px; }
+  .summary-grid-controls { display: flex; justify-content: flex-end; margin-bottom: -8px; }
+  .summary-grid td.summary-grid__month--current, .summary-grid th.summary-grid__month--current { background: var(--accent-bg) !important; }
+  .summary-grid__notes td { background: var(--surface); border-bottom: 2px solid var(--border-strong); }
+  .summary-grid__notenote { width: 100%; min-width: 90px; border: 1px solid transparent; background: transparent; color: var(--text-secondary); font-size: 11px; font-style: italic; padding: 3px 4px; border-radius: 4px; }
+  .summary-grid__notenote:hover, .summary-grid__notenote:focus { border-color: var(--border); font-style: normal; outline: none; }
 
   .cashflow-chart { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
   .cashflow-chart h3 { margin: 0; font-size: 14px; color: var(--text-secondary); }
@@ -197,6 +217,15 @@
   }
 
   .draws-summary h3 { font-size: 14px; color: var(--text-secondary); }
+
+  .annual-draw-summary h3 { font-size: 14px; color: var(--text-secondary); margin: 0; }
+  .annual-grid-wrap { max-height: none; }
+  .annual-grid th, .annual-grid td { position: static !important; box-shadow: none !important; }
+  .annual-draw-summary__draw-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .annual-draw-summary__draw-header label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); }
+  .annual-draw-summary__period { font-size: 12px; color: var(--text-muted); }
+  .cap-table-summary { width: 100%; }
+  .cap-table-summary th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 500; text-align: left; padding: 4px 10px 4px 0; }
 
   .auto-split { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
   .auto-split h3 { margin: 0 0 12px; font-size: 14px; color: var(--text-secondary); }
@@ -243,8 +272,9 @@
   .print-preview-bar__row { display: flex; align-items: center; gap: 12px; }
   .print-preview-bar__settings { flex-wrap: wrap; font-size: 11px; }
   .print-preview-bar__settings label { display: flex; flex-direction: column; gap: 2px; opacity: 0.9; }
-  .print-preview-bar__settings select { font-size: 12px; padding: 3px 4px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.15); color: #fff; }
+  .print-preview-bar__settings select, .print-preview-bar__settings input[type="number"] { font-size: 12px; padding: 3px 4px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.15); color: #fff; width: 64px; }
   .print-preview-bar__settings select option { color: #0b0b0b; }
+  .print-preview-bar__checkbox { flex-direction: row !important; align-items: center; gap: 6px !important; }
   .print-preview-bar__label { font-weight: 600; flex: 1; }
   .print-preview-bar button { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
   .print-preview-bar button:hover { background: rgba(255,255,255,0.25); }
@@ -259,11 +289,17 @@
   .print-preview-mode tr { page-break-inside: avoid; }
   .print-preview-mode .print-real-content { display: none !important; }
 
-  .print-pages { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 0 48px; background: var(--page); }
+  .print-pages { display: flex; flex-direction: column; gap: 12px; padding: 16px 0 48px; background: var(--page); }
+  .print-pages__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 24px; }
   .print-pages__hint { color: var(--text-muted); font-size: 12px; margin: 0; }
+  .print-pages__zoom { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+  .print-pages__zoom button { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 4px; padding: 2px 8px; cursor: pointer; color: var(--text-primary); }
+  .print-pages__zoom span { min-width: 40px; text-align: center; font-variant-numeric: tabular-nums; }
+  .print-pages__pages { display: flex; flex-direction: column; align-items: center; gap: 24px; transform-origin: top center; }
   .print-page { background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.18); position: relative; flex-shrink: 0; }
   .print-page__viewport { overflow: hidden; position: relative; }
   .print-page__content { position: absolute; top: 0; left: 0; }
+  .print-page__header-overlay { position: absolute; top: 0; left: 0; right: 0; overflow: hidden; background: #fff; z-index: 5; }
   .print-page__label { position: absolute; bottom: 4px; right: 8px; font-size: 10px; color: var(--text-muted); }
 
   .recurring-draws { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 4px 16px; }
@@ -278,7 +314,30 @@
   .export-csv__title { margin: 0 0 2px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
   .export-csv__option { display: flex; align-items: center; gap: 8px; font-size: 13px; }
   .export-csv__actions { display: flex; justify-content: space-between; margin-top: 8px; }
+
+  .theme-picker { position: relative; }
+  .theme-picker__panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 50; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); padding: 14px 16px; width: 200px; display: flex; flex-direction: column; gap: 8px; }
+  .theme-picker__title { margin: 4px 0 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); }
+  .theme-picker__modes { display: flex; gap: 6px; }
+  .theme-picker__mode-btn { flex: 1; background: var(--page); border: 1px solid var(--border); border-radius: 6px; padding: 5px 0; font-size: 12px; cursor: pointer; color: var(--text-primary); }
+  .theme-picker__mode-btn--active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .theme-picker__accents { display: flex; gap: 8px; }
+  .theme-picker__swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+  .theme-picker__swatch--active { border-color: var(--text-primary); }
+  .theme-picker__swatch--blue { background: #2a78d6; }
+  .theme-picker__swatch--green { background: #2e9e5b; }
+  .theme-picker__swatch--purple { background: #7c5cff; }
+  .theme-picker__swatch--orange { background: #c8720a; }
+  .theme-picker__swatch--rose { background: #c23b6b; }
 </style>
+<script>
+  (function () {
+    var storedMode = localStorage.getItem("cf-theme-mode");
+    if (storedMode && storedMode !== "system") document.documentElement.setAttribute("data-theme", storedMode);
+    var storedAccent = localStorage.getItem("cf-theme-accent");
+    if (storedAccent) document.documentElement.setAttribute("data-accent", storedAccent);
+  })();
+</script>
 </head>
 <body>
 
@@ -311,8 +370,15 @@
           <option value="narrow">Narrow</option>
           <option value="normal" selected>Normal</option>
           <option value="wide">Wide</option>
+          <option value="custom">Custom</option>
         </select>
       </label>
+      <div id="ppCustomMargins" style="display:none;">
+        <label>Top (in)<input type="number" step="0.1" min="0" id="ppMarginTop" value="0.5" /></label>
+        <label>Right (in)<input type="number" step="0.1" min="0" id="ppMarginRight" value="0.5" /></label>
+        <label>Bottom (in)<input type="number" step="0.1" min="0" id="ppMarginBottom" value="0.5" /></label>
+        <label>Left (in)<input type="number" step="0.1" min="0" id="ppMarginLeft" value="0.5" /></label>
+      </div>
       <label>Font size
         <select id="ppFontSize">
           <option value="small">Small</option>
@@ -333,6 +399,10 @@
           <option value="grayscale">Grayscale</option>
         </select>
       </label>
+      <label class="print-preview-bar__checkbox">
+        <input type="checkbox" id="ppRepeatHeader" checked />
+        Repeat header row on every page
+      </label>
     </div>
   </div>
   <div class="signed-in-bar">
@@ -348,7 +418,10 @@
       <div class="export-csv__panel" id="exportCsvPanel" style="display:none;"></div>
     </div>
     <button class="link-button" id="printBtn" type="button">Print Preview</button>
-    <button class="theme-toggle" id="themeToggle" type="button">◐ Toggle theme</button>
+    <div class="theme-picker" id="themePickerWrap">
+      <button class="link-button" id="themePickerBtn" type="button">Theme</button>
+      <div class="theme-picker__panel" id="themePickerPanel" style="display:none;"></div>
+    </div>
   </header>
   <div id="bootMessage" class="section__intro" style="padding: 0 0 16px;">Loading your data…</div>
 
@@ -371,10 +444,17 @@
   var activeTab = "summary";
   var expandedLineItemId = null;
   var expandedMemberId = null;
-  var chartCollapsed = false;
+  var chartCollapsed = true;
+  var projectHeaderCollapsed = true;
+  var highlightCurrentMonth = true;
+  var monthNotes = {};
   var showDrawGenerator = false;
   var previewMode = false;
-  var printSettings = { pageSize: "letter", orientation: "landscape", margin: "normal", fontSize: "normal", rowSize: "normal", colorMode: "color" };
+  var printSettings = {
+    pageSize: "letter", orientation: "landscape", margin: "normal",
+    marginTopIn: 0.5, marginRightIn: 0.5, marginBottomIn: 0.5, marginLeftIn: 0.5,
+    fontSize: "normal", rowSize: "normal", colorMode: "color", repeatHeader: true,
+  };
   var nextIdCounter = 1;
 
   function genId(prefix) { return prefix + "_" + (nextIdCounter++) + "_" + Math.random().toString(36).slice(2, 7); }
@@ -630,22 +710,164 @@
     return draws;
   }
 
+  // ---------- month notes (local only, per project) ----------
+  var monthNotesLoadedForId = null;
+  function loadMonthNotesFor(projectId) {
+    try { return JSON.parse(localStorage.getItem("cf-month-notes:" + projectId) || "{}"); } catch (e) { return {}; }
+  }
+  function saveMonthNotesFor(projectId, notes) {
+    localStorage.setItem("cf-month-notes:" + projectId, JSON.stringify(notes));
+  }
+  function currentMonthKey() {
+    var now = new Date();
+    return now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-01";
+  }
+
+  // ---------- annual + draw request summary ----------
+  function yearOf(month) { return month.slice(0, 4); }
+  function monthAfter(yyyyMm) {
+    var p = yyyyMm.split("-").map(Number);
+    var total = p[0] * 12 + (p[1] - 1) + 1;
+    return Math.floor(total / 12) + "-" + String((total % 12) + 1).padStart(2, "0");
+  }
+  function drawPeriodMonths(months, sortedDraws, activeDrawId) {
+    var activeIndex = sortedDraws.findIndex(function (d) { return d.id === activeDrawId; });
+    if (activeIndex < 0) return [];
+    var activeDraw = sortedDraws[activeIndex];
+    var previousDraw = activeIndex > 0 ? sortedDraws[activeIndex - 1] : null;
+    var endMonth = activeDraw.date.slice(0, 7);
+    var startMonth = previousDraw ? monthAfter(previousDraw.date.slice(0, 7)) : (months[0] ? months[0].slice(0, 7) : null);
+    if (!startMonth) return [];
+    return months.filter(function (m) {
+      var mm = m.slice(0, 7);
+      return mm >= startMonth && mm <= endMonth;
+    });
+  }
+  var selectedDrawId = null;
+  function buildAnnualDrawSummary(summary) {
+    if (summary.months.length === 0) return null;
+    var years = Array.from(new Set(summary.months.map(yearOf))).sort();
+    var sortedDraws = summary.draws.slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
+    var activeDrawId = selectedDrawId || (sortedDraws.length ? sortedDraws[sortedDraws.length - 1].id : null);
+    var periodMonths = drawPeriodMonths(summary.months, sortedDraws, activeDrawId);
+
+    function yearTotal(monthly, year) {
+      return summary.months.filter(function (m) { return yearOf(m) === year; }).reduce(function (a, m) { return a + (monthly[m] || 0); }, 0);
+    }
+    function periodTotal(monthly) {
+      return periodMonths.reduce(function (a, m) { return a + (monthly[m] || 0); }, 0);
+    }
+
+    var wrap = document.createElement("div");
+    wrap.className = "section annual-draw-summary";
+    var html = "<h3>Budget Totals by Year</h3>";
+    html += '<div class="summary-grid-wrap annual-grid-wrap"><table class="summary-grid annual-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money">Budget</th>';
+    years.forEach(function (y) { html += '<th class="col-money">' + y + "</th>"; });
+    html += "</tr></thead><tbody>";
+    summary.categories.forEach(function (cat) {
+      html += '<tr class="summary-grid__category"><td class="summary-grid__label">' + esc(cat.name) + "</td><td class=\"col-money\"></td>";
+      years.forEach(function () { html += '<td class="col-money"></td>'; });
+      html += "</tr>";
+      cat.lineItems.forEach(function (li) {
+        html += '<tr><td class="summary-grid__label">' + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
+        html += '<td class="col-money">' + fmtMoney(li.totalBudget) + "</td>";
+        years.forEach(function (y) { var t = yearTotal(li.monthly, y); html += '<td class="col-money">' + (t ? fmtMoney(t) : "") + "</td>"; });
+        html += "</tr>";
+      });
+      html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money\">" + fmtMoney(cat.subtotalTotal) + "</td>";
+      years.forEach(function (y) { var t = yearTotal(cat.subtotal, y); html += '<td class="col-money">' + (t ? fmtMoney(t) : "") + "</td>"; });
+      html += "</tr>";
+    });
+    html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money">' + fmtMoney(summary.grandTotal.total) + "</td>";
+    years.forEach(function (y) { var t = yearTotal(summary.grandTotal.monthly, y); html += '<td class="col-money">' + (t ? fmtMoney(t) : "") + "</td>"; });
+    html += "</tr></tbody></table></div>";
+
+    if (sortedDraws.length > 0) {
+      html += '<div class="annual-draw-summary__draw-header"><h3>Draw Request Summary</h3><label>Draw<select id="drawSummarySelect">';
+      sortedDraws.forEach(function (d) {
+        html += '<option value="' + d.id + '"' + (d.id === activeDrawId ? " selected" : "") + ">" + esc(d.name) + " (" + fmtMonth(d.date.slice(0, 10)) + ")</option>";
+      });
+      html += "</select></label>";
+      if (periodMonths.length > 0) {
+        html += '<span class="annual-draw-summary__period">Period: ' + fmtMonth(periodMonths[0]) + " – " + fmtMonth(periodMonths[periodMonths.length - 1]) + "</span>";
+      }
+      html += "</div>";
+
+      html += '<div class="summary-grid-wrap annual-grid-wrap"><table class="summary-grid annual-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money">Budget</th>';
+      periodMonths.forEach(function (m) { html += '<th class="col-money">' + fmtMonth(m) + "</th>"; });
+      html += '<th class="col-money">Draw Total</th></tr></thead><tbody>';
+      summary.categories.forEach(function (cat) {
+        html += '<tr class="summary-grid__category"><td class="summary-grid__label">' + esc(cat.name) + "</td><td class=\"col-money\"></td>";
+        periodMonths.forEach(function () { html += '<td class="col-money"></td>'; });
+        html += '<td class="col-money"></td></tr>';
+        cat.lineItems.forEach(function (li) {
+          var t = periodTotal(li.monthly);
+          var anyInPeriod = periodMonths.some(function (m) { return li.monthly[m]; });
+          if (!t && !anyInPeriod) return;
+          html += '<tr><td class="summary-grid__label">' + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
+          html += '<td class="col-money">' + fmtMoney(li.totalBudget) + "</td>";
+          periodMonths.forEach(function (m) { html += '<td class="col-money">' + (li.monthly[m] ? fmtMoney(li.monthly[m]) : "") + "</td>"; });
+          html += '<td class="col-money"><strong>' + (t ? fmtMoney(t) : "") + "</strong></td></tr>";
+        });
+        html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money\">" + fmtMoney(cat.subtotalTotal) + "</td>";
+        periodMonths.forEach(function (m) { html += '<td class="col-money">' + (cat.subtotal[m] ? fmtMoney(cat.subtotal[m]) : "") + "</td>"; });
+        html += '<td class="col-money">' + fmtMoney(periodTotal(cat.subtotal)) + "</td></tr>";
+      });
+      html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money">' + fmtMoney(summary.grandTotal.total) + "</td>";
+      periodMonths.forEach(function (m) { html += '<td class="col-money">' + (summary.grandTotal.monthly[m] ? fmtMoney(summary.grandTotal.monthly[m]) : "") + "</td>"; });
+      html += '<td class="col-money">' + fmtMoney(periodTotal(summary.grandTotal.monthly)) + "</td></tr></tbody></table></div>";
+    }
+
+    if (summary.capTable.length > 0) {
+      html += "<h3>Cap Table Summary</h3>";
+      html += '<table class="mini-table cap-table-summary"><thead><tr><th>Member</th><th>Role</th><th class="col-money">Ownership %</th><th class="col-money">Contributed</th><th class="col-money">Distributed</th><th class="col-money">Net Position</th></tr></thead><tbody>';
+      summary.capTable.forEach(function (r) {
+        html += "<tr><td>" + esc(r.name) + "</td><td>" + esc(r.role) + "</td><td class=\"col-money\">" + r.ownershipPercent.toFixed(2) + "%</td>" +
+          '<td class="col-money">' + fmtMoney(r.totalContributed) + "</td><td class=\"col-money\">" + fmtMoney(r.totalDistributed) + "</td>" +
+          '<td class="col-money">' + fmtMoney(r.netPosition) + "</td></tr>";
+      });
+      html += "</tbody></table>";
+    }
+
+    wrap.innerHTML = html;
+    var select = wrap.querySelector("#drawSummarySelect");
+    if (select) {
+      select.addEventListener("change", function () {
+        selectedDrawId = select.value;
+        render();
+      });
+    }
+    return wrap;
+  }
+
   // ---------- print layout ----------
   var PAGE_SIZES_IN = { letter: [8.5, 11], a4: [8.27, 11.69], legal: [8.5, 14], tabloid: [11, 17] };
-  var MARGINS_IN = { narrow: 0.25, normal: 0.5, wide: 1 };
+  var PRESET_MARGINS_IN = { narrow: 0.25, normal: 0.5, wide: 1 };
   var FONT_SCALE = { small: 0.85, normal: 1, large: 1.2 };
   var ROW_PADDING_PX = { compact: 2, normal: 5, spacious: 9 };
+  var printZoom = 100;
+
+  function marginsIn(settings) {
+    if (settings.margin === "custom") {
+      return { top: settings.marginTopIn, right: settings.marginRightIn, bottom: settings.marginBottomIn, left: settings.marginLeftIn };
+    }
+    var v = PRESET_MARGINS_IN[settings.margin];
+    return { top: v, right: v, bottom: v, left: v };
+  }
   function pageDimensionsPx(settings) {
     var dims = PAGE_SIZES_IN[settings.pageSize].slice();
     if (settings.orientation === "landscape") dims = [dims[1], dims[0]];
-    var marginIn = MARGINS_IN[settings.margin];
+    var m = marginsIn(settings);
     var DPI = 96;
     return {
       pageWidthPx: Math.round(dims[0] * DPI),
       pageHeightPx: Math.round(dims[1] * DPI),
-      contentWidthPx: Math.round((dims[0] - marginIn * 2) * DPI),
-      contentHeightPx: Math.round((dims[1] - marginIn * 2) * DPI),
-      marginPx: Math.round(marginIn * DPI),
+      contentWidthPx: Math.round((dims[0] - m.left - m.right) * DPI),
+      contentHeightPx: Math.round((dims[1] - m.top - m.bottom) * DPI),
+      marginTopPx: Math.round(m.top * DPI),
+      marginRightPx: Math.round(m.right * DPI),
+      marginBottomPx: Math.round(m.bottom * DPI),
+      marginLeftPx: Math.round(m.left * DPI),
     };
   }
   function pageCssSize(settings) {
@@ -653,7 +875,10 @@
     var names = { letter: "letter", a4: "A4", legal: "legal" };
     return names[settings.pageSize] + " " + settings.orientation;
   }
-  function marginCss(settings) { return MARGINS_IN[settings.margin] + "in"; }
+  function marginCss(settings) {
+    var m = marginsIn(settings);
+    return m.top + "in " + m.right + "in " + m.bottom + "in " + m.left + "in";
+  }
 
   function stripIds(node) {
     if (node.removeAttribute) node.removeAttribute("id");
@@ -666,9 +891,24 @@
     var dims = pageDimensionsPx(settings);
     var container = document.createElement("div");
     container.className = "print-pages";
+
+    var toolbar = document.createElement("div");
+    toolbar.className = "print-pages__toolbar";
     var hint = document.createElement("p");
     hint.className = "print-pages__hint";
-    container.appendChild(hint);
+    toolbar.appendChild(hint);
+    var zoomWrap = document.createElement("div");
+    zoomWrap.className = "print-pages__zoom";
+    zoomWrap.innerHTML =
+      '<button id="ppZoomOut">−</button><span id="ppZoomLabel">' + printZoom + '%</span>' +
+      '<button id="ppZoomIn">+</button><button id="ppZoomFit">Fit to width</button>';
+    toolbar.appendChild(zoomWrap);
+    container.appendChild(toolbar);
+
+    var pagesWrap = document.createElement("div");
+    pagesWrap.className = "print-pages__pages";
+    pagesWrap.style.zoom = printZoom / 100;
+    container.appendChild(pagesWrap);
 
     var measureClone = sourceEl.cloneNode(true);
     stripIds(measureClone);
@@ -678,9 +918,32 @@
     measureClone.style.left = "-99999px";
     document.body.appendChild(measureClone);
     var totalHeight = measureClone.scrollHeight;
+
+    var headerHeight = 0, headerCloneHtml = null, mainGridBottom = Infinity;
+    if (settings.repeatHeader) {
+      var table = measureClone.querySelector(".summary-grid");
+      var headEl = table ? table.querySelector("thead") : null;
+      var headRow = headEl ? headEl.querySelector("tr") : null;
+      if (table && headEl && headRow) {
+        mainGridBottom = table.offsetTop + table.offsetHeight;
+        var widths = Array.from(headRow.children).map(function (cell) { return cell.offsetWidth; });
+        var clone = headEl.cloneNode(true);
+        var cloneRow = clone.querySelector("tr");
+        if (cloneRow) {
+          Array.from(cloneRow.children).forEach(function (cell, idx) { cell.style.width = (widths[idx] || 0) + "px"; });
+        }
+        headerHeight = headEl.offsetHeight;
+        headerCloneHtml = '<table class="summary-grid" style="table-layout:fixed;width:' + dims.contentWidthPx + 'px;">' + clone.outerHTML + "</table>";
+      }
+    }
     document.body.removeChild(measureClone);
 
-    var numPages = Math.max(1, Math.ceil(totalHeight / dims.contentHeightPx));
+    var page1Capacity = dims.contentHeightPx;
+    var laterCapacity = settings.repeatHeader ? Math.max(50, dims.contentHeightPx - headerHeight) : dims.contentHeightPx;
+    var remaining = Math.max(0, totalHeight - page1Capacity);
+    var numPages = totalHeight <= page1Capacity ? 1 : 1 + Math.ceil(remaining / laterCapacity);
+    function shiftForPage(i) { return i === 0 ? 0 : page1Capacity + (i - 1) * laterCapacity; }
+
     hint.textContent = numPages + " page" + (numPages > 1 ? "s" : "") + " at this page size — approximate; printed table headers repeat on every page automatically.";
 
     for (var i = 0; i < numPages; i++) {
@@ -693,13 +956,26 @@
       viewport.className = "print-page__viewport";
       viewport.style.width = dims.contentWidthPx + "px";
       viewport.style.height = dims.contentHeightPx + "px";
-      viewport.style.margin = dims.marginPx + "px";
+      viewport.style.marginTop = dims.marginTopPx + "px";
+      viewport.style.marginRight = dims.marginRightPx + "px";
+      viewport.style.marginBottom = dims.marginBottomPx + "px";
+      viewport.style.marginLeft = dims.marginLeftPx + "px";
+
+      var showHeaderOverlay = i > 0 && settings.repeatHeader && headerCloneHtml && shiftForPage(i) < mainGridBottom;
+      if (showHeaderOverlay) {
+        var overlay = document.createElement("div");
+        overlay.className = "print-page__header-overlay";
+        overlay.style.height = headerHeight + "px";
+        overlay.innerHTML = headerCloneHtml;
+        viewport.appendChild(overlay);
+      }
 
       var contentClone = sourceEl.cloneNode(true);
       stripIds(contentClone);
       contentClone.className += " print-page__content";
       contentClone.style.width = dims.contentWidthPx + "px";
-      contentClone.style.transform = "translateY(-" + (i * dims.contentHeightPx) + "px)";
+      contentClone.style.top = (showHeaderOverlay ? headerHeight : 0) + "px";
+      contentClone.style.transform = "translateY(-" + shiftForPage(i) + "px)";
 
       viewport.appendChild(contentClone);
       pageDiv.appendChild(viewport);
@@ -709,8 +985,23 @@
       label.textContent = "Page " + (i + 1) + " of " + numPages;
       pageDiv.appendChild(label);
 
-      container.appendChild(pageDiv);
+      pagesWrap.appendChild(pageDiv);
     }
+
+    toolbar.querySelector("#ppZoomOut").addEventListener("click", function () {
+      printZoom = Math.max(25, printZoom - 10);
+      render();
+    });
+    toolbar.querySelector("#ppZoomIn").addEventListener("click", function () {
+      printZoom = Math.min(200, printZoom + 10);
+      render();
+    });
+    toolbar.querySelector("#ppZoomFit").addEventListener("click", function () {
+      var available = window.innerWidth - 64;
+      printZoom = Math.max(25, Math.min(200, Math.floor((available / dims.pageWidthPx) * 100)));
+      render();
+    });
+
     return container;
   }
 
@@ -913,15 +1204,34 @@
 
   function renderHeader() {
     var el = document.getElementById("projectHeader");
+    if (projectHeaderCollapsed) {
+      el.className = "project-header project-header--collapsed";
+      el.innerHTML =
+        '<span class="project-header__collapsed-name">' + esc(project.name || "Untitled project") + "</span>" +
+        '<button class="link-button" id="projectHeaderExpandBtn">▸ expand</button>';
+      document.getElementById("projectHeaderExpandBtn").addEventListener("click", function () {
+        projectHeaderCollapsed = false;
+        render();
+      });
+      return;
+    }
+    el.className = "project-header";
     el.innerHTML =
-      '<input class="editable-text" style="font-size:22px;font-weight:700;border:none;background:transparent;width:100%;margin-bottom:12px;padding:2px 0;" ' +
-        'value="' + esc(project.name) + '" data-bind="project.name" />' +
+      '<div class="project-header__top">' +
+        '<input class="editable-text project-header__name" ' +
+          'value="' + esc(project.name) + '" data-bind="project.name" />' +
+        '<button class="link-button" id="projectHeaderCollapseBtn">▾ collapse</button>' +
+      '</div>' +
       '<div class="project-header__meta">' +
         '<label>Client<b><input class="editable-text" value="' + esc(project.client || "") + '" placeholder="—" data-bind="project.client" /></b></label>' +
         '<label>Address<b><input class="editable-text" value="' + esc(project.address || "") + '" placeholder="—" data-bind="project.address" /></b></label>' +
         '<label>Date<b><input type="date" value="' + esc(project.projectDate) + '" data-bind="project.projectDate" /></b></label>' +
       '</div>';
     bindInputs(el);
+    document.getElementById("projectHeaderCollapseBtn").addEventListener("click", function () {
+      projectHeaderCollapsed = true;
+      render();
+    });
   }
 
   function bindInputs(container) {
@@ -973,6 +1283,13 @@
       return;
     }
 
+    if (monthNotesLoadedForId !== project.id) {
+      monthNotes = loadMonthNotesFor(project.id);
+      monthNotesLoadedForId = project.id;
+    }
+    var thisMonth = currentMonthKey();
+    function monthClass(m) { return highlightCurrentMonth && m === thisMonth ? " summary-grid__month--current" : ""; }
+
     var chartWrap = document.createElement("div");
     chartWrap.className = "cashflow-chart";
     chartWrap.innerHTML =
@@ -985,27 +1302,37 @@
     }
     wrap.appendChild(chartWrap);
 
+    var controlsWrap = document.createElement("div");
+    controlsWrap.className = "summary-grid-controls";
+    controlsWrap.innerHTML = '<button class="link-button" id="highlightMonthBtn">' + (highlightCurrentMonth ? "☑" : "☐") + " highlight current month</button>";
+    wrap.appendChild(controlsWrap);
+
     var gridWrap = document.createElement("div");
     gridWrap.className = "summary-grid-wrap";
     var html = '<table class="summary-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money summary-grid__budget">Budget</th>';
-    summary.months.forEach(function (m, i) { html += '<th class="col-money"><span class="summary-grid__monthnum">Month ' + (i + 1) + '</span><span class="summary-grid__monthlabel">' + fmtMonth(m) + "</span></th>"; });
+    summary.months.forEach(function (m, i) { html += '<th class="col-money' + monthClass(m) + '"><span class="summary-grid__monthnum">Month ' + (i + 1) + '</span><span class="summary-grid__monthlabel">' + fmtMonth(m) + "</span></th>"; });
     html += "</tr></thead><tbody>";
+    html += '<tr class="summary-grid__notes"><td class="summary-grid__label">Notes</td><td class="summary-grid__budget"></td>';
+    summary.months.forEach(function (m) {
+      html += '<td' + (monthClass(m) ? ' class="' + monthClass(m).trim() + '"' : "") + '><input class="summary-grid__notenote" data-note-month="' + m + '" value="' + esc(monthNotes[m] || "") + '" placeholder="—" /></td>';
+    });
+    html += "</tr>";
     summary.categories.forEach(function (cat) {
       html += '<tr class="summary-grid__category"><td class="summary-grid__label">' + esc(cat.name) + '</td><td class="summary-grid__budget"></td>';
-      summary.months.forEach(function () { html += "<td></td>"; });
+      summary.months.forEach(function (m) { html += '<td class="' + ("col-money" + monthClass(m)) + '"></td>'; });
       html += "</tr>";
       cat.lineItems.forEach(function (li) {
         html += '<tr><td class="summary-grid__label">' + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
         html += '<td class="col-money summary-grid__budget">' + fmtMoney(li.totalBudget) + "</td>";
-        summary.months.forEach(function (m) { html += '<td class="col-money">' + (li.monthly[m] ? fmtMoney(li.monthly[m]) : "") + "</td>"; });
+        summary.months.forEach(function (m) { html += '<td class="col-money' + monthClass(m) + '">' + (li.monthly[m] ? fmtMoney(li.monthly[m]) : "") + "</td>"; });
         html += "</tr>";
       });
       html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money summary-grid__budget\">" + fmtMoney(cat.subtotalTotal) + "</td>";
-      summary.months.forEach(function (m) { html += '<td class="col-money">' + (cat.subtotal[m] ? fmtMoney(cat.subtotal[m]) : "") + "</td>"; });
+      summary.months.forEach(function (m) { html += '<td class="col-money' + monthClass(m) + '">' + (cat.subtotal[m] ? fmtMoney(cat.subtotal[m]) : "") + "</td>"; });
       html += "</tr>";
     });
     html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money summary-grid__budget">' + fmtMoney(summary.grandTotal.total) + "</td>";
-    summary.months.forEach(function (m) { html += '<td class="col-money">' + (summary.grandTotal.monthly[m] ? fmtMoney(summary.grandTotal.monthly[m]) : "") + "</td>"; });
+    summary.months.forEach(function (m) { html += '<td class="col-money' + monthClass(m) + '">' + (summary.grandTotal.monthly[m] ? fmtMoney(summary.grandTotal.monthly[m]) : "") + "</td>"; });
     html += "</tr></tbody></table>";
     gridWrap.innerHTML = html;
     wrap.appendChild(gridWrap);
@@ -1020,6 +1347,9 @@
       wrap.appendChild(drawsWrap);
     }
 
+    var annualDrawWrap = buildAnnualDrawSummary(summary);
+    if (annualDrawWrap) wrap.appendChild(annualDrawWrap);
+
     el.appendChild(wrap);
     var labelCell = gridWrap.querySelector(".summary-grid__label");
     if (labelCell) gridWrap.style.setProperty("--budget-col-left", labelCell.offsetWidth + "px");
@@ -1033,6 +1363,16 @@
     document.getElementById("chartCollapseBtn").addEventListener("click", function () {
       chartCollapsed = !chartCollapsed;
       render();
+    });
+    document.getElementById("highlightMonthBtn").addEventListener("click", function () {
+      highlightCurrentMonth = !highlightCurrentMonth;
+      render();
+    });
+    wrap.querySelectorAll("[data-note-month]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        monthNotes[input.getAttribute("data-note-month")] = input.value;
+        saveMonthNotesFor(project.id, monthNotes);
+      });
     });
   }
 
@@ -1566,13 +1906,46 @@
     });
   }
 
-  // ---------- theme toggle ----------
-  document.getElementById("themeToggle").addEventListener("click", function () {
-    var root = document.documentElement;
-    var current = root.getAttribute("data-theme");
-    var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    var effectiveIsDark = current ? current === "dark" : prefersDark;
-    root.setAttribute("data-theme", effectiveIsDark ? "light" : "dark");
+  // ---------- theme picker ----------
+  var THEME_MODES = [["system", "System"], ["light", "Light"], ["dark", "Dark"]];
+  var THEME_ACCENTS = ["blue", "green", "purple", "orange", "rose"];
+  function getThemeMode() { return localStorage.getItem("cf-theme-mode") || "system"; }
+  function getThemeAccent() { return localStorage.getItem("cf-theme-accent") || "blue"; }
+  function setThemeMode(mode) {
+    localStorage.setItem("cf-theme-mode", mode);
+    if (mode === "system") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", mode);
+  }
+  function setThemeAccent(accent) {
+    localStorage.setItem("cf-theme-accent", accent);
+    document.documentElement.setAttribute("data-accent", accent);
+  }
+  function renderThemePanel() {
+    var panel = document.getElementById("themePickerPanel");
+    var mode = getThemeMode(), accent = getThemeAccent();
+    var html = '<p class="theme-picker__title">Mode</p><div class="theme-picker__modes">';
+    THEME_MODES.forEach(function (m) {
+      html += '<button class="theme-picker__mode-btn' + (mode === m[0] ? " theme-picker__mode-btn--active" : "") + '" data-mode="' + m[0] + '">' + m[1] + "</button>";
+    });
+    html += '</div><p class="theme-picker__title">Accent color</p><div class="theme-picker__accents">';
+    THEME_ACCENTS.forEach(function (a) {
+      html += '<button class="theme-picker__swatch theme-picker__swatch--' + a + (accent === a ? " theme-picker__swatch--active" : "") + '" data-accent="' + a + '" aria-label="' + a + '" title="' + a + '"></button>';
+    });
+    html += "</div>";
+    panel.innerHTML = html;
+    panel.querySelectorAll("[data-mode]").forEach(function (btn) {
+      btn.addEventListener("click", function () { setThemeMode(btn.getAttribute("data-mode")); renderThemePanel(); });
+    });
+    panel.querySelectorAll("[data-accent]").forEach(function (btn) {
+      btn.addEventListener("click", function () { setThemeAccent(btn.getAttribute("data-accent")); renderThemePanel(); });
+    });
+  }
+  document.getElementById("themePickerBtn").addEventListener("click", function () {
+    var panel = document.getElementById("themePickerPanel");
+    var isOpen = panel.style.display !== "none";
+    if (isOpen) { panel.style.display = "none"; return; }
+    renderThemePanel();
+    panel.style.display = "flex";
   });
 
   // ---------- export csv ----------
@@ -1647,7 +2020,32 @@
   });
   document.getElementById("ppMargin").addEventListener("change", function (e) {
     printSettings.margin = e.target.value;
+    document.getElementById("ppCustomMargins").style.display = printSettings.margin === "custom" ? "contents" : "none";
     applyPrintSettingsToDom();
+    render();
+  });
+  document.getElementById("ppMarginTop").addEventListener("change", function (e) {
+    printSettings.marginTopIn = Number(e.target.value) || 0;
+    applyPrintSettingsToDom();
+    render();
+  });
+  document.getElementById("ppMarginRight").addEventListener("change", function (e) {
+    printSettings.marginRightIn = Number(e.target.value) || 0;
+    applyPrintSettingsToDom();
+    render();
+  });
+  document.getElementById("ppMarginBottom").addEventListener("change", function (e) {
+    printSettings.marginBottomIn = Number(e.target.value) || 0;
+    applyPrintSettingsToDom();
+    render();
+  });
+  document.getElementById("ppMarginLeft").addEventListener("change", function (e) {
+    printSettings.marginLeftIn = Number(e.target.value) || 0;
+    applyPrintSettingsToDom();
+    render();
+  });
+  document.getElementById("ppRepeatHeader").addEventListener("change", function (e) {
+    printSettings.repeatHeader = e.target.checked;
     render();
   });
   document.getElementById("ppFontSize").addEventListener("change", function (e) {
