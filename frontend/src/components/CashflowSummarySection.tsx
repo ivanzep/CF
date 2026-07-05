@@ -37,9 +37,10 @@ export function CashflowSummarySection({ summary }: Props) {
                 Line item
               </th>
               <th className="col-money summary-grid__budget">Budget</th>
-              {summary.months.map((m) => (
+              {summary.months.map((m, i) => (
                 <th key={m} className="col-money">
-                  {fmtMonth(m)}
+                  <span className="summary-grid__monthnum">Month {i + 1}</span>
+                  <span className="summary-grid__monthlabel">{fmtMonth(m)}</span>
                 </th>
               ))}
             </tr>

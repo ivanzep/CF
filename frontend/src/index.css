@@ -480,7 +480,8 @@ select:focus {
 /* Cashflow summary grid */
 
 .summary-grid-wrap {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: 70vh;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
@@ -533,6 +534,19 @@ select:focus {
   color: var(--text-muted);
   margin-right: 6px;
   font-variant-numeric: tabular-nums;
+}
+
+.summary-grid__monthnum {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 400;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.summary-grid__monthlabel {
+  display: block;
 }
 
 .summary-grid__category td {
@@ -658,6 +672,7 @@ select:focus {
 
   .summary-grid-wrap {
     overflow: visible !important;
+    max-height: none !important;
     border: none;
   }
 
@@ -678,4 +693,75 @@ select:focus {
   tr {
     page-break-inside: avoid;
   }
+}
+
+/* On-screen print preview (mirrors the @media print rules above, live) */
+
+.print-preview-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--accent);
+  color: #fff;
+  padding: 10px 24px;
+}
+
+.print-preview-bar__label {
+  font-weight: 600;
+  flex: 1;
+}
+
+.print-preview-bar button {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.print-preview-bar button:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.print-preview-mode {
+  background: #fff;
+}
+
+.print-preview-mode .app-topbar,
+.print-preview-mode .tabs,
+.print-preview-mode .signed-in-bar {
+  display: none !important;
+}
+
+.print-preview-mode .app,
+.print-preview-mode .section {
+  max-width: none;
+}
+
+.print-preview-mode .summary-grid-wrap {
+  overflow: visible !important;
+  max-height: none !important;
+  border: none;
+}
+
+.print-preview-mode .summary-grid th,
+.print-preview-mode .summary-grid__label,
+.print-preview-mode .summary-grid__budget {
+  position: static !important;
+  box-shadow: none !important;
+}
+
+.print-preview-mode .cashflow-chart,
+.print-preview-mode .summary-grid-wrap,
+.print-preview-mode .draws-summary {
+  border: none;
+  box-shadow: none;
+}
+
+.print-preview-mode tr {
+  page-break-inside: avoid;
 }

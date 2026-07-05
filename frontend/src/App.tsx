@@ -16,6 +16,11 @@ function App() {
   const [projectId, setProjectId] = useState<string | undefined>(undefined);
   const [tab, setTab] = useState<Tab>("summary");
   const [busy, setBusy] = useState<string | null>(null);
+  const [previewMode, setPreviewMode] = useState(false);
+
+  useEffect(() => {
+    document.body.classList.toggle("print-preview-mode", previewMode);
+  }, [previewMode]);
 
   useEffect(() => {
     if (!projectId && projects && projects.length > 0) setProjectId(projects[0].id);
@@ -74,7 +79,15 @@ function App() {
   }
 
   return (
-    <div className="app">
+    <>
+      {previewMode && (
+        <div className="print-preview-bar">
+          <span className="print-preview-bar__label">Print Preview</span>
+          <button onClick={() => window.print()}>Print</button>
+          <button onClick={() => setPreviewMode(false)}>Exit preview</button>
+        </div>
+      )}
+      <div className="app">
       <header className="app-topbar">
         <span className="app-topbar__title">Cashflow Tracker</span>
         {projects && projects.length > 0 && (
@@ -90,8 +103,8 @@ function App() {
           + new project
         </button>
         {busy && <span className="app-topbar__busy">{busy}</span>}
-        <button className="link-button" onClick={() => window.print()}>
-          Print
+        <button className="link-button" onClick={() => setPreviewMode(true)}>
+          Print Preview
         </button>
       </header>
 
@@ -127,7 +140,8 @@ function App() {
           {tab === "cap-table" && summary && <CapTableSection project={project} summary={summary} />}
         </>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 

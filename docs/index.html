@@ -170,7 +170,7 @@
   .mini-table td { padding: 4px 10px 4px 0; border-bottom: 1px solid var(--border); }
   .mini-table input { width: 130px; }
 
-  .summary-grid-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  .summary-grid-wrap { overflow: auto; max-height: 70vh; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
   .summary-grid { font-size: 12.5px; }
   .summary-grid th, .summary-grid td { padding: 5px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   .summary-grid th { position: sticky; top: 0; background: var(--surface); color: var(--text-muted); font-weight: 500; text-align: right; z-index: 2; }
@@ -178,6 +178,8 @@
   .summary-grid__budget { position: sticky; left: var(--budget-col-left, 260px); background: var(--surface); box-shadow: 2px 0 4px -2px rgba(0,0,0,0.15); z-index: 1; }
   .summary-grid th.summary-grid__label, .summary-grid th.summary-grid__budget { z-index: 3; }
   .summary-grid__code { color: var(--text-muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
+  .summary-grid__monthnum { display: block; font-size: 9.5px; font-weight: 400; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; }
+  .summary-grid__monthlabel { display: block; }
   .summary-grid__category td { font-weight: 600; background: var(--page); }
   .summary-grid__category td.summary-grid__label, .summary-grid__category td.summary-grid__budget { background: var(--page); }
   .summary-grid__subtotal td { font-weight: 600; border-top: 1px solid var(--border-strong); }
@@ -229,11 +231,24 @@
     body { background: #fff; }
     button, select, .tabs, .app-topbar, .signed-in-bar { display: none !important; }
     .app, .section { max-width: none; }
-    .summary-grid-wrap { overflow: visible !important; border: none; }
+    .summary-grid-wrap { overflow: visible !important; max-height: none !important; border: none; }
     .summary-grid th, .summary-grid__label, .summary-grid__budget { position: static !important; box-shadow: none !important; }
     .cashflow-chart, .summary-grid-wrap, .draws-summary { border: none; box-shadow: none; }
     tr { page-break-inside: avoid; }
   }
+
+  /* On-screen print preview (mirrors the @media print rules above, live) */
+  .print-preview-bar { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 12px; background: var(--accent); color: #fff; padding: 10px 24px; }
+  .print-preview-bar__label { font-weight: 600; flex: 1; }
+  .print-preview-bar button { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+  .print-preview-bar button:hover { background: rgba(255,255,255,0.25); }
+  .print-preview-mode { background: #fff; }
+  .print-preview-mode .app-topbar, .print-preview-mode .tabs, .print-preview-mode .signed-in-bar { display: none !important; }
+  .print-preview-mode .app, .print-preview-mode .section { max-width: none; }
+  .print-preview-mode .summary-grid-wrap { overflow: visible !important; max-height: none !important; border: none; }
+  .print-preview-mode .summary-grid th, .print-preview-mode .summary-grid__label, .print-preview-mode .summary-grid__budget { position: static !important; box-shadow: none !important; }
+  .print-preview-mode .cashflow-chart, .print-preview-mode .summary-grid-wrap, .print-preview-mode .draws-summary { border: none; box-shadow: none; }
+  .print-preview-mode tr { page-break-inside: avoid; }
 </style>
 </head>
 <body>
@@ -241,6 +256,11 @@
 <div id="setupGate"></div>
 
 <div id="appRoot" style="display:none;">
+  <div class="print-preview-bar" id="printPreviewBar" style="display:none;">
+    <span class="print-preview-bar__label">Print Preview</span>
+    <button id="ppPrintBtn" type="button">Print</button>
+    <button id="ppExitBtn" type="button">Exit preview</button>
+  </div>
   <div class="signed-in-bar">
     <span>Connected to Google Sheets</span>
     <button class="link-button" id="signOutBtn">sign out</button>
@@ -252,7 +272,7 @@
       <button class="link-button" id="newProjectBtn" style="display:none;">+ new project</button>
       <div class="app-topbar__spacer"></div>
       <span id="bootMessage" class="app-topbar__busy"></span>
-      <button class="link-button" id="printBtn" type="button">Print</button>
+      <button class="link-button" id="printBtn" type="button">Print Preview</button>
       <button class="theme-toggle" id="themeToggle" type="button">◐ Toggle theme</button>
     </header>
 
@@ -1361,7 +1381,7 @@
     var gridWrap = document.createElement("div");
     gridWrap.className = "summary-grid-wrap";
     var html = '<table class="summary-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money summary-grid__budget">Budget</th>';
-    summary.months.forEach(function (m) { html += '<th class="col-money">' + fmtMonth(m) + "</th>"; });
+    summary.months.forEach(function (m, i) { html += '<th class="col-money"><span class="summary-grid__monthnum">Month ' + (i + 1) + '</span><span class="summary-grid__monthlabel">' + fmtMonth(m) + "</span></th>"; });
     html += "</tr></thead><tbody>";
     summary.categories.forEach(function (cat) {
       html += '<tr class="summary-grid__category"><td class="summary-grid__label">' + esc(cat.name) + '</td><td class="summary-grid__budget"></td>';
@@ -1881,7 +1901,17 @@
   });
 
   // ---------- print ----------
+  function setPreviewMode(on) {
+    document.body.classList.toggle("print-preview-mode", on);
+    document.getElementById("printPreviewBar").style.display = on ? "flex" : "none";
+  }
   document.getElementById("printBtn").addEventListener("click", function () {
+    setPreviewMode(true);
+  });
+  document.getElementById("ppExitBtn").addEventListener("click", function () {
+    setPreviewMode(false);
+  });
+  document.getElementById("ppPrintBtn").addEventListener("click", function () {
     window.print();
   });
 
