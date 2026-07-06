@@ -305,16 +305,37 @@
     @page { size: landscape; margin: 12mm; }
     body { background: #fff; font-size: calc(1em * var(--print-font-scale, 1)); }
     body.print-grayscale { filter: grayscale(1); }
-    button, select, .tabs, .app-topbar, .signed-in-bar { display: none !important; }
-    .app, .section { max-width: none; }
+    button, select, .tabs, .app-topbar, .signed-in-bar, .print-preview-bar, .project-header { display: none !important; }
+    .app, .section { max-width: none; padding: 0 !important; margin: 0 !important; }
+    /* Real printing reuses the same pre-paginated page boxes as the on-screen preview
+       (not native CSS reflow) because break-before on nested/transformed elements is
+       unreliable in WebKit/iOS Safari; explicit page-break-after between simple sibling
+       boxes is far more broadly supported. */
+    .print-real-content { display: none !important; }
+    .print-pages { padding: 0 !important; gap: 0 !important; background: #fff !important; }
+    .print-pages__toolbar { display: none !important; }
+    /* break-after on a flex item is unreliable across engines (notably iOS Safari);
+       force plain block flow for print so the forced page breaks actually apply. */
+    .print-pages__pages { display: block !important; padding: 0 !important; gap: 0 !important; }
+    .print-page-outer { display: block !important; margin: 0 auto !important; }
+    .print-page-outer { width: var(--natural-width) !important; height: var(--natural-height) !important; }
+    .print-page-outer:not(:last-child) { break-after: page; page-break-after: always; }
+    /* @page's own margin already reserves the border band for the header/footer
+       running content, so the page box itself should fill just the printable
+       (content) area — not simulate its own margin on top of that. */
+    /* Absolutely-positioned boxes (used on-screen to simulate a "sheet of paper" and to
+       crop overflow) confuse the print engine's own pagination — it can re-fragment their
+       content independently of the .print-page-outer break-after boundaries, producing
+       phantom extra pages. Real print no longer needs the positioning/clipping at all
+       since each page's content is already sized to fit, so fall back to plain flow. */
+    .print-page { position: static !important; transform: none !important; box-shadow: none !important; width: 100% !important; height: 100% !important; }
+    .print-page__viewport { position: static !important; overflow: visible !important; margin: 0 !important; width: 100% !important; height: 100% !important; }
+    .print-page__label { display: none !important; }
     .summary-grid-wrap { overflow: visible !important; max-height: none !important; border: none; }
     .summary-grid th, .summary-grid__label, .summary-grid__budget { position: static !important; box-shadow: none !important; }
     .summary-grid th, .summary-grid td { padding-top: var(--print-row-padding, 5px); padding-bottom: var(--print-row-padding, 5px); }
     .cashflow-chart, .summary-grid-wrap, .draws-summary { border: none; box-shadow: none; }
     tr { page-break-inside: avoid; }
-    body.pp-section-breaks .print-section-boundary { break-before: page; }
-    .print-pages, .print-preview-bar { display: none !important; }
-    .print-preview-mode .print-real-content { display: block !important; }
     .summary-grid { font-size: calc(12.5px * var(--print-font-scale, 1)); }
     .summary-grid__monthnum { font-size: calc(9.5px * var(--print-font-scale, 1)); }
     .summary-grid__grandtotal td { font-size: calc(13.5px * var(--print-font-scale, 1)); }
@@ -337,8 +358,7 @@
   .print-page-outer { position: relative; flex-shrink: 0; overflow: hidden; }
   .print-page { background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.18); position: absolute; top: 0; left: 0; }
   .print-page__viewport { overflow: hidden; position: relative; }
-  .print-page__content { position: absolute; top: 0; left: 0; }
-  .print-page__header-overlay { position: absolute; top: 0; left: 0; right: 0; overflow: hidden; background: #fff; z-index: 5; }
+  .print-page__content { position: relative; }
   .print-page__label { position: absolute; bottom: 4px; right: 8px; font-size: 10px; color: var(--text-muted); }
 
   .recurring-draws { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 4px 16px; }
@@ -1062,6 +1082,12 @@
     container.appendChild(pagesWrap);
     var zoomFactor = printZoom / 100;
 
+    // ---- measure a detached clone at real content width, then flatten every section
+    // into a list of atomic blocks and individual table rows ("units") in document order.
+    // Real pages are built by walking this list and greedily filling each page, so every
+    // page contains genuinely separate, correctly-sized DOM (no oversized clipped clones
+    // relying on overflow:hidden, which print engines — especially iOS Safari — do not
+    // reliably fragment/crop the way on-screen rendering does).
     var measureClone = sourceEl.cloneNode(true);
     stripIds(measureClone);
     measureClone.style.position = "absolute";
@@ -1069,50 +1095,153 @@
     measureClone.style.width = dims.contentWidthPx + "px";
     measureClone.style.left = "-99999px";
     document.body.appendChild(measureClone);
-    var totalHeight = measureClone.scrollHeight;
 
-    var sectionMarkers = settings.pageBreakPerSection
-      ? Array.from(measureClone.querySelectorAll(".print-section-boundary"))
-          .map(function (el) { return el.offsetTop; })
-          .sort(function (a, b) { return a - b; })
-      : [];
+    var runCounter = 0;
+    var units = [];
 
-    var headerHeight = 0, headerCloneHtml = null, mainGridBottom = Infinity;
-    if (settings.repeatHeader) {
-      var table = measureClone.querySelector(".summary-grid");
-      var headEl = table ? table.querySelector("thead") : null;
-      var headRow = headEl ? headEl.querySelector("tr") : null;
-      if (table && headEl && headRow) {
-        mainGridBottom = table.offsetTop + table.offsetHeight;
-        var widths = Array.from(headRow.children).map(function (cell) { return cell.offsetWidth; });
-        var clone = headEl.cloneNode(true);
-        var cloneRow = clone.querySelector("tr");
-        if (cloneRow) {
-          Array.from(cloneRow.children).forEach(function (cell, idx) { cell.style.width = (widths[idx] || 0) + "px"; });
-        }
-        headerHeight = headEl.offsetHeight;
-        headerCloneHtml = '<table class="summary-grid" style="table-layout:fixed;width:' + dims.contentWidthPx + 'px;">' + clone.outerHTML + "</table>";
-      }
+    function isTableWrapper(el) {
+      return el.children.length === 1 && el.children[0].tagName === "TABLE";
     }
+
+    function pushTableRun(table, wrapperClassName, isFirstUnitOfSection) {
+      var headEl = table.querySelector("thead");
+      var bodyEl = table.querySelector("tbody");
+      var headRow = headEl ? headEl.querySelector("tr") : null;
+      var colWidths = headRow ? Array.from(headRow.children).map(function (c) { return c.offsetWidth; }) : [];
+      var totalWidth = colWidths.reduce(function (a, b) { return a + b; }, 0) || table.offsetWidth;
+      var run = {
+        runId: "run" + (runCounter++),
+        tableClassName: table.className,
+        wrapperClassName: wrapperClassName || null,
+        colgroupHtml: colWidths.length
+          ? "<colgroup>" + colWidths.map(function (w) { return '<col style="width:' + w + 'px">'; }).join("") + "</colgroup>"
+          : "",
+        totalWidth: totalWidth,
+        theadHtml: headEl ? headEl.outerHTML : "",
+        theadHeight: headEl ? headEl.offsetHeight : 0,
+        firstPageDone: false,
+      };
+      var rows = bodyEl ? Array.from(bodyEl.children) : [];
+      if (rows.length === 0) {
+        units.push({ type: "row", run: run, html: "", height: 0, sectionStart: isFirstUnitOfSection });
+        return;
+      }
+      rows.forEach(function (tr, idx) {
+        units.push({
+          type: "row", run: run, html: tr.outerHTML, height: tr.offsetHeight,
+          sectionStart: isFirstUnitOfSection && idx === 0,
+        });
+      });
+    }
+
+    Array.from(measureClone.querySelectorAll(".print-fit-section")).forEach(function (section) {
+      // Fit-scaled sections (transform:scale applied by applyFitScaling) keep their old
+      // all-or-nothing placement: splitting a scaled section into fresh per-row table
+      // fragments would silently drop the scaling, since the transform lives on the
+      // section wrapper, not on the individual rows/tables inside it. Horizontal overflow
+      // for fit-height sections is handled separately (continuation pages), not here.
+      if (section.style.transform) {
+        var sizer = section.parentElement && section.parentElement.children.length === 1 ? section.parentElement : section;
+        units.push({ type: "atomic", html: sizer.outerHTML, height: sizer.offsetHeight, sectionStart: true });
+        return;
+      }
+      var entries = Array.from(section.children).map(function (child) {
+        if (child.tagName === "TABLE") return { kind: "table", table: child, wrapperClassName: null, node: child };
+        if (isTableWrapper(child)) return { kind: "table", table: child.children[0], wrapperClassName: child.className, node: child };
+        return { kind: "atomic", node: child };
+      });
+      if (!entries.some(function (e) { return e.kind === "table"; })) {
+        units.push({ type: "atomic", html: section.outerHTML, height: section.offsetHeight, sectionStart: true });
+        return;
+      }
+      var isFirstUnit = true;
+      entries.forEach(function (e) {
+        if (e.kind === "table") pushTableRun(e.table, e.wrapperClassName, isFirstUnit);
+        else units.push({ type: "atomic", html: e.node.outerHTML, height: e.node.offsetHeight, sectionStart: isFirstUnit });
+        isFirstUnit = false;
+      });
+    });
+
     document.body.removeChild(measureClone);
 
-    var page1Capacity = dims.contentHeightPx;
-    var laterCapacity = settings.repeatHeader ? Math.max(50, dims.contentHeightPx - headerHeight) : dims.contentHeightPx;
+    // ---- page-fill walk ----
+    // A tiny safety margin keeps content from landing exactly flush with the page
+    // boundary: print engines can round sub-pixel layout units unfavorably at an exact
+    // edge and push a near-empty remainder onto a phantom extra page.
+    var PAGE_SAFETY_MARGIN_PX = 4;
+    var pageContentBudget = Math.max(0, dims.contentHeightPx - PAGE_SAFETY_MARGIN_PX);
+    var pageEls = [];
+    var currentPage = null;
+    var pageIsEmpty = true;
+    var remaining = 0;
+    var currentTbody = null;
+    var currentRunId = null;
 
-    var pageBounds = [];
-    var cursor = 0;
-    while (cursor < totalHeight) {
-      var capacity = pageBounds.length === 0 ? page1Capacity : laterCapacity;
-      var naiveEnd = cursor + capacity;
-      var nextMarker = sectionMarkers.filter(function (m) { return m > cursor && m < naiveEnd; })[0];
-      var pageEnd = nextMarker !== undefined ? nextMarker : naiveEnd;
-      if (pageEnd <= cursor) pageEnd = naiveEnd;
-      pageBounds.push(Math.min(pageEnd, totalHeight));
-      cursor = pageEnd;
+    function newPage() {
+      currentPage = document.createElement("div");
+      currentPage.className = "print-page__content";
+      pageEls.push(currentPage);
+      pageIsEmpty = true;
+      remaining = pageContentBudget;
+      currentTbody = null;
+      currentRunId = null;
     }
-    if (pageBounds.length === 0) pageBounds.push(totalHeight);
-    var numPages = pageBounds.length;
-    function shiftForPage(i) { return i === 0 ? 0 : pageBounds[i - 1]; }
+    newPage();
+
+    function appendAtomicHtml(html) {
+      var tmp = document.createElement("div");
+      tmp.innerHTML = html;
+      if (tmp.firstElementChild) currentPage.appendChild(tmp.firstElementChild);
+      pageIsEmpty = false;
+    }
+
+    function openRunOnCurrentPage(run, headerCost) {
+      var wrapperEl = currentPage;
+      if (run.wrapperClassName) {
+        wrapperEl = document.createElement("div");
+        wrapperEl.className = run.wrapperClassName;
+        currentPage.appendChild(wrapperEl);
+      }
+      var table = document.createElement("table");
+      table.className = run.tableClassName;
+      table.style.tableLayout = "fixed";
+      if (run.totalWidth) table.style.width = run.totalWidth + "px";
+      var showHead = headerCost > 0;
+      table.innerHTML = run.colgroupHtml + (showHead ? run.theadHtml : "") + "<tbody></tbody>";
+      wrapperEl.appendChild(table);
+      currentTbody = table.querySelector("tbody");
+      currentRunId = run.runId;
+      pageIsEmpty = false;
+      remaining -= headerCost;
+      run.firstPageDone = true;
+    }
+
+    units.forEach(function (u) {
+      if (settings.pageBreakPerSection && u.sectionStart && !pageIsEmpty) newPage();
+
+      if (u.type === "atomic") {
+        if (u.height > remaining && !pageIsEmpty) newPage();
+        appendAtomicHtml(u.html);
+        remaining -= u.height;
+        currentTbody = null;
+        currentRunId = null;
+        return;
+      }
+
+      var needsNewRun = currentRunId !== u.run.runId;
+      var headerCost = needsNewRun && (!u.run.firstPageDone || settings.repeatHeader) ? u.run.theadHeight : 0;
+      if (headerCost + u.height > remaining && !pageIsEmpty) {
+        newPage();
+        needsNewRun = true;
+        headerCost = !u.run.firstPageDone || settings.repeatHeader ? u.run.theadHeight : 0;
+      }
+      if (needsNewRun) openRunOnCurrentPage(u.run, headerCost);
+      if (u.html) currentTbody.insertAdjacentHTML("beforeend", u.html);
+      remaining -= u.height;
+      pageIsEmpty = false;
+    });
+
+    var numPages = pageEls.length;
 
     hint.textContent = numPages + " page" + (numPages > 1 ? "s" : "") + " at this page size — approximate; printed table headers repeat on every page automatically.";
 
@@ -1121,6 +1250,8 @@
       pageOuter.className = "print-page-outer";
       pageOuter.style.width = (dims.pageWidthPx * zoomFactor) + "px";
       pageOuter.style.height = (dims.pageHeightPx * zoomFactor) + "px";
+      pageOuter.style.setProperty("--natural-width", dims.contentWidthPx + "px");
+      pageOuter.style.setProperty("--natural-height", dims.contentHeightPx + "px");
 
       var pageDiv = document.createElement("div");
       pageDiv.className = "print-page";
@@ -1138,23 +1269,7 @@
       viewport.style.marginBottom = dims.marginBottomPx + "px";
       viewport.style.marginLeft = dims.marginLeftPx + "px";
 
-      var showHeaderOverlay = i > 0 && settings.repeatHeader && headerCloneHtml && shiftForPage(i) < mainGridBottom;
-      if (showHeaderOverlay) {
-        var overlay = document.createElement("div");
-        overlay.className = "print-page__header-overlay";
-        overlay.style.height = headerHeight + "px";
-        overlay.innerHTML = headerCloneHtml;
-        viewport.appendChild(overlay);
-      }
-
-      var contentClone = sourceEl.cloneNode(true);
-      stripIds(contentClone);
-      contentClone.className += " print-page__content";
-      contentClone.style.width = dims.contentWidthPx + "px";
-      contentClone.style.top = (showHeaderOverlay ? headerHeight : 0) + "px";
-      contentClone.style.transform = "translateY(-" + shiftForPage(i) + "px)";
-
-      viewport.appendChild(contentClone);
+      viewport.appendChild(pageEls[i]);
       pageDiv.appendChild(viewport);
 
       var label = document.createElement("div");
@@ -1666,8 +1781,6 @@
     applyFitScaling(wrap, printSettings, printFit);
     var pages = buildPrintPages(wrap, printSettings);
     el.appendChild(pages);
-    wrap.classList.add("print-real-content");
-    el.appendChild(wrap);
   }
 
   function buildChart(months, monthly) {
