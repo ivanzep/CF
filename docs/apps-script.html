@@ -268,6 +268,10 @@
   .print-preview-bar__settings select option { color: #0b0b0b; }
   .print-preview-bar__checkbox { flex-direction: row !important; align-items: center; gap: 6px !important; }
   .print-preview-bar__margins { display: flex; gap: 12px; }
+  .print-preview-bar__sections-list { flex-wrap: wrap; gap: 8px 20px; }
+  .print-preview-bar__section-row { display: flex; align-items: center; gap: 8px; }
+  .print-preview-bar__section-row select { font-size: 12px; padding: 3px 4px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.15); color: #fff; }
+  .print-preview-bar__section-row select option { color: #0b0b0b; }
   .print-preview-bar__label { font-weight: 600; flex: 1; }
   .print-preview-bar button { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
   .print-preview-bar button:hover { background: rgba(255,255,255,0.25); }
@@ -303,7 +307,7 @@
     .summary-grid th, .summary-grid td { padding-top: var(--print-row-padding, 5px); padding-bottom: var(--print-row-padding, 5px); }
     .cashflow-chart, .summary-grid-wrap, .draws-summary { border: none; box-shadow: none; }
     tr { page-break-inside: avoid; }
-    .summary-section-header { break-before: page; }
+    body.pp-section-breaks .print-section-boundary { break-before: page; }
     .print-pages, .print-preview-bar { display: none !important; }
     .print-preview-mode .print-real-content { display: block !important; }
     .summary-grid { font-size: calc(12.5px * var(--print-font-scale, 1)); }
@@ -409,12 +413,8 @@
         <label>Bottom (in)<input type="number" step="0.1" min="0" id="ppMarginBottom" value="0.5" /></label>
         <label>Left (in)<input type="number" step="0.1" min="0" id="ppMarginLeft" value="0.5" /></label>
       </div>
-      <label>Font size
-        <select id="ppFontSize">
-          <option value="small">Small</option>
-          <option value="normal" selected>Normal</option>
-          <option value="large">Large</option>
-        </select>
+      <label>Font size (%)
+        <input type="number" step="5" min="50" max="200" id="ppFontScale" value="100" />
       </label>
       <label>Row size
         <select id="ppRowSize">
@@ -433,14 +433,42 @@
         <input type="checkbox" id="ppRepeatHeader" checked />
         Repeat header row on every page
       </label>
+      <label class="print-preview-bar__checkbox">
+        <input type="checkbox" id="ppPageBreakSections" checked />
+        Page break before each section
+      </label>
+      <label>Logo URL
+        <input type="text" id="ppLogoUrl" placeholder="https://…" style="width:180px;" />
+      </label>
     </div>
     <div class="print-preview-bar__row print-preview-bar__sections">
-      <span class="print-preview-bar__label">Include sections</span>
-      <label class="print-preview-bar__checkbox"><input type="checkbox" id="psCashflow" checked /> Cashflow</label>
-      <label class="print-preview-bar__checkbox"><input type="checkbox" id="psYearly" checked /> Budget by Year</label>
-      <label class="print-preview-bar__checkbox"><input type="checkbox" id="psDrawReport" checked /> Draw Request</label>
-      <label class="print-preview-bar__checkbox"><input type="checkbox" id="psCapTable" checked /> Cap Table</label>
-      <label class="print-preview-bar__checkbox"><input type="checkbox" id="psDrawsList" checked /> Draws</label>
+      <span class="print-preview-bar__label">Sections</span>
+    </div>
+    <div class="print-preview-bar__row print-preview-bar__sections-list">
+      <div class="print-preview-bar__section-row">
+        <label class="print-preview-bar__checkbox"><input type="checkbox" id="psCashflowGraph" checked /> Cashflow Graph</label>
+        <select id="pfCashflowGraph"><option value="none">No fit</option><option value="width">Fit width</option><option value="height">Fit height</option></select>
+      </div>
+      <div class="print-preview-bar__section-row">
+        <label class="print-preview-bar__checkbox"><input type="checkbox" id="psCashflowTable" checked /> Cashflow Table</label>
+        <select id="pfCashflowTable"><option value="none">No fit</option><option value="width">Fit width</option><option value="height">Fit height</option></select>
+      </div>
+      <div class="print-preview-bar__section-row">
+        <label class="print-preview-bar__checkbox"><input type="checkbox" id="psYearly" checked /> Budget by Year</label>
+        <select id="pfYearly"><option value="none">No fit</option><option value="width">Fit width</option><option value="height">Fit height</option></select>
+      </div>
+      <div class="print-preview-bar__section-row">
+        <label class="print-preview-bar__checkbox"><input type="checkbox" id="psDrawReport" checked /> Draw Request</label>
+        <select id="pfDrawReport"><option value="none">No fit</option><option value="width">Fit width</option><option value="height">Fit height</option></select>
+      </div>
+      <div class="print-preview-bar__section-row">
+        <label class="print-preview-bar__checkbox"><input type="checkbox" id="psCapTable" checked /> Cap Table</label>
+        <select id="pfCapTable"><option value="none">No fit</option><option value="width">Fit width</option><option value="height">Fit height</option></select>
+      </div>
+      <div class="print-preview-bar__section-row">
+        <label class="print-preview-bar__checkbox"><input type="checkbox" id="psDrawsList" checked /> Draws</label>
+        <select id="pfDrawsList"><option value="none">No fit</option><option value="width">Fit width</option><option value="height">Fit height</option></select>
+      </div>
     </div>
   </div>
   <div class="signed-in-bar">
@@ -498,9 +526,11 @@
   var printSettings = {
     pageSize: "letter", orientation: "landscape",
     marginTopIn: 0.5, marginRightIn: 0.5, marginBottomIn: 0.5, marginLeftIn: 0.5,
-    fontSize: "normal", rowSize: "normal", colorMode: "color", repeatHeader: true,
+    fontScalePercent: 100, rowSize: "normal", colorMode: "color", repeatHeader: true,
+    pageBreakPerSection: true, logoUrl: "",
   };
-  var printSections = { cashflow: true, yearly: true, drawReport: true, capTable: true, drawsList: true };
+  var printSections = { cashflowGraph: true, cashflowTable: true, yearly: true, drawReport: true, capTable: true, drawsList: true };
+  var printFit = { cashflowGraph: "none", cashflowTable: "none", yearly: "none", drawReport: "none", capTable: "none", drawsList: "none" };
   var nextIdCounter = 1;
 
   function genId(prefix) { return prefix + "_" + (nextIdCounter++) + "_" + Math.random().toString(36).slice(2, 7); }
@@ -825,7 +855,7 @@
   var selectedDrawId = null;
   function summarySectionHeader(key, title, collapse, forcePrint) {
     var collapsed = collapse[key];
-    var h = '<div class="summary-section-header"><h2>' + title + "</h2>";
+    var h = '<div class="summary-section-header print-section-boundary"><h2>' + title + "</h2>";
     if (!forcePrint) {
       h += '<button class="link-button" data-summary-collapse="' + key + '">' + (collapsed ? "▸ expand" : "▾ collapse") + "</button>";
     }
@@ -850,87 +880,105 @@
 
     var wrap = document.createElement("div");
     wrap.className = "section annual-draw-summary";
-    var html = "";
+    var anyContent = false;
+
     if (include.yearly) {
-    html += summarySectionHeader("yearly", "Budget Totals by Year", collapse, forcePrint);
-    if (!collapse.yearly) {
-      html += '<div class="summary-grid-wrap annual-grid-wrap"><table class="summary-grid annual-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money">Budget</th>';
-      years.forEach(function (y) { html += '<th class="col-money">' + y + "</th>"; });
-      html += "</tr></thead><tbody>";
-      summary.categories.forEach(function (cat) {
-        html += '<tr class="summary-grid__category"><td class="summary-grid__label">' + esc(cat.name) + "</td><td class=\"col-money\"></td>";
-        years.forEach(function () { html += '<td class="col-money"></td>'; });
-        html += "</tr>";
-        cat.lineItems.forEach(function (li) {
-          html += '<tr><td class="summary-grid__label">' + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
-          html += '<td class="col-money">' + fmtMoney(li.totalBudget) + "</td>";
-          years.forEach(function (y) { var t = yearTotal(li.monthly, y); html += '<td class="col-money">' + (t ? fmtMoney(t) : "") + "</td>"; });
-          html += "</tr>";
+      var yearlyHtml = summarySectionHeader("yearly", "Budget Totals by Year", collapse, forcePrint);
+      if (!collapse.yearly) {
+        yearlyHtml += '<div class="summary-grid-wrap annual-grid-wrap"><table class="summary-grid annual-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money">Budget</th>';
+        years.forEach(function (y) { yearlyHtml += '<th class="col-money">' + y + "</th>"; });
+        yearlyHtml += "</tr></thead><tbody>";
+        summary.categories.forEach(function (cat) {
+          yearlyHtml += '<tr class="summary-grid__category"><td class="summary-grid__label">' + esc(cat.name) + "</td><td class=\"col-money\"></td>";
+          years.forEach(function () { yearlyHtml += '<td class="col-money"></td>'; });
+          yearlyHtml += "</tr>";
+          cat.lineItems.forEach(function (li) {
+            yearlyHtml += '<tr><td class="summary-grid__label">' + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
+            yearlyHtml += '<td class="col-money">' + fmtMoney(li.totalBudget) + "</td>";
+            years.forEach(function (y) { var t = yearTotal(li.monthly, y); yearlyHtml += '<td class="col-money">' + (t ? fmtMoney(t) : "") + "</td>"; });
+            yearlyHtml += "</tr>";
+          });
+          yearlyHtml += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money\">" + fmtMoney(cat.subtotalTotal) + "</td>";
+          years.forEach(function (y) { var t = yearTotal(cat.subtotal, y); yearlyHtml += '<td class="col-money">' + (t ? fmtMoney(t) : "") + "</td>"; });
+          yearlyHtml += "</tr>";
         });
-        html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money\">" + fmtMoney(cat.subtotalTotal) + "</td>";
-        years.forEach(function (y) { var t = yearTotal(cat.subtotal, y); html += '<td class="col-money">' + (t ? fmtMoney(t) : "") + "</td>"; });
-        html += "</tr>";
-      });
-      html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money">' + fmtMoney(summary.grandTotal.total) + "</td>";
-      years.forEach(function (y) { var t = yearTotal(summary.grandTotal.monthly, y); html += '<td class="col-money">' + (t ? fmtMoney(t) : "") + "</td>"; });
-      html += "</tr></tbody></table></div>";
-    }
+        yearlyHtml += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money">' + fmtMoney(summary.grandTotal.total) + "</td>";
+        years.forEach(function (y) { var t = yearTotal(summary.grandTotal.monthly, y); yearlyHtml += '<td class="col-money">' + (t ? fmtMoney(t) : "") + "</td>"; });
+        yearlyHtml += "</tr></tbody></table></div>";
+      }
+      var yearlyDiv = document.createElement("div");
+      yearlyDiv.className = "print-fit-section";
+      yearlyDiv.setAttribute("data-fit-key", "yearly");
+      yearlyDiv.innerHTML = yearlyHtml;
+      wrap.appendChild(yearlyDiv);
+      anyContent = true;
     }
 
     if (include.drawReport && sortedDraws.length > 0) {
-      html += summarySectionHeader("drawReport", "Draw Request Summary", collapse, forcePrint);
+      var drawHtml = summarySectionHeader("drawReport", "Draw Request Summary", collapse, forcePrint);
       if (!collapse.drawReport) {
-        html += '<div class="annual-draw-summary__draw-header"><label>Draw<select id="drawSummarySelect">';
+        drawHtml += '<div class="annual-draw-summary__draw-header"><label>Draw<select id="drawSummarySelect">';
         sortedDraws.forEach(function (d) {
-          html += '<option value="' + d.id + '"' + (d.id === activeDrawId ? " selected" : "") + ">" + esc(d.name) + " (" + fmtMonth(d.date.slice(0, 10)) + ")</option>";
+          drawHtml += '<option value="' + d.id + '"' + (d.id === activeDrawId ? " selected" : "") + ">" + esc(d.name) + " (" + fmtMonth(d.date.slice(0, 10)) + ")</option>";
         });
-        html += "</select></label>";
+        drawHtml += "</select></label>";
         if (periodMonths.length > 0) {
-          html += '<span class="annual-draw-summary__period">Period: ' + fmtMonth(periodMonths[0]) + " – " + fmtMonth(periodMonths[periodMonths.length - 1]) + "</span>";
+          drawHtml += '<span class="annual-draw-summary__period">Period: ' + fmtMonth(periodMonths[0]) + " – " + fmtMonth(periodMonths[periodMonths.length - 1]) + "</span>";
         }
-        html += "</div>";
+        drawHtml += "</div>";
 
-        html += '<div class="summary-grid-wrap annual-grid-wrap"><table class="summary-grid annual-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money">Budget</th>';
-        periodMonths.forEach(function (m) { html += '<th class="col-money">' + fmtMonth(m) + "</th>"; });
-        html += '<th class="col-money">Draw Total</th></tr></thead><tbody>';
+        drawHtml += '<div class="summary-grid-wrap annual-grid-wrap"><table class="summary-grid annual-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money">Budget</th>';
+        periodMonths.forEach(function (m) { drawHtml += '<th class="col-money">' + fmtMonth(m) + "</th>"; });
+        drawHtml += '<th class="col-money">Draw Total</th></tr></thead><tbody>';
         summary.categories.forEach(function (cat) {
-          html += '<tr class="summary-grid__category"><td class="summary-grid__label">' + esc(cat.name) + "</td><td class=\"col-money\"></td>";
-          periodMonths.forEach(function () { html += '<td class="col-money"></td>'; });
-          html += '<td class="col-money"></td></tr>';
+          drawHtml += '<tr class="summary-grid__category"><td class="summary-grid__label">' + esc(cat.name) + "</td><td class=\"col-money\"></td>";
+          periodMonths.forEach(function () { drawHtml += '<td class="col-money"></td>'; });
+          drawHtml += '<td class="col-money"></td></tr>';
           cat.lineItems.forEach(function (li) {
             var t = periodTotal(li.monthly);
             var anyInPeriod = periodMonths.some(function (m) { return li.monthly[m]; });
             if (!t && !anyInPeriod) return;
-            html += '<tr><td class="summary-grid__label">' + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
-            html += '<td class="col-money">' + fmtMoney(li.totalBudget) + "</td>";
-            periodMonths.forEach(function (m) { html += '<td class="col-money">' + (li.monthly[m] ? fmtMoney(li.monthly[m]) : "") + "</td>"; });
-            html += '<td class="col-money"><strong>' + (t ? fmtMoney(t) : "") + "</strong></td></tr>";
+            drawHtml += '<tr><td class="summary-grid__label">' + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
+            drawHtml += '<td class="col-money">' + fmtMoney(li.totalBudget) + "</td>";
+            periodMonths.forEach(function (m) { drawHtml += '<td class="col-money">' + (li.monthly[m] ? fmtMoney(li.monthly[m]) : "") + "</td>"; });
+            drawHtml += '<td class="col-money"><strong>' + (t ? fmtMoney(t) : "") + "</strong></td></tr>";
           });
-          html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money\">" + fmtMoney(cat.subtotalTotal) + "</td>";
-          periodMonths.forEach(function (m) { html += '<td class="col-money">' + (cat.subtotal[m] ? fmtMoney(cat.subtotal[m]) : "") + "</td>"; });
-          html += '<td class="col-money">' + fmtMoney(periodTotal(cat.subtotal)) + "</td></tr>";
+          drawHtml += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money\">" + fmtMoney(cat.subtotalTotal) + "</td>";
+          periodMonths.forEach(function (m) { drawHtml += '<td class="col-money">' + (cat.subtotal[m] ? fmtMoney(cat.subtotal[m]) : "") + "</td>"; });
+          drawHtml += '<td class="col-money">' + fmtMoney(periodTotal(cat.subtotal)) + "</td></tr>";
         });
-        html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money">' + fmtMoney(summary.grandTotal.total) + "</td>";
-        periodMonths.forEach(function (m) { html += '<td class="col-money">' + (summary.grandTotal.monthly[m] ? fmtMoney(summary.grandTotal.monthly[m]) : "") + "</td>"; });
-        html += '<td class="col-money">' + fmtMoney(periodTotal(summary.grandTotal.monthly)) + "</td></tr></tbody></table></div>";
+        drawHtml += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money">' + fmtMoney(summary.grandTotal.total) + "</td>";
+        periodMonths.forEach(function (m) { drawHtml += '<td class="col-money">' + (summary.grandTotal.monthly[m] ? fmtMoney(summary.grandTotal.monthly[m]) : "") + "</td>"; });
+        drawHtml += '<td class="col-money">' + fmtMoney(periodTotal(summary.grandTotal.monthly)) + "</td></tr></tbody></table></div>";
       }
+      var drawReportDiv = document.createElement("div");
+      drawReportDiv.className = "print-fit-section";
+      drawReportDiv.setAttribute("data-fit-key", "drawReport");
+      drawReportDiv.innerHTML = drawHtml;
+      wrap.appendChild(drawReportDiv);
+      anyContent = true;
     }
 
     if (include.capTable && summary.capTable.length > 0) {
-      html += summarySectionHeader("capTable", "Cap Table Summary", collapse, forcePrint);
+      var capHtml = summarySectionHeader("capTable", "Cap Table Summary", collapse, forcePrint);
       if (!collapse.capTable) {
-        html += '<table class="mini-table cap-table-summary"><thead><tr><th>Member</th><th>Role</th><th class="col-money">Ownership %</th><th class="col-money">Contributed</th><th class="col-money">Distributed</th><th class="col-money">Net Position</th></tr></thead><tbody>';
+        capHtml += '<table class="mini-table cap-table-summary"><thead><tr><th>Member</th><th>Role</th><th class="col-money">Ownership %</th><th class="col-money">Contributed</th><th class="col-money">Distributed</th><th class="col-money">Net Position</th></tr></thead><tbody>';
         summary.capTable.forEach(function (r) {
-          html += "<tr><td>" + esc(r.name) + "</td><td>" + esc(r.role) + "</td><td class=\"col-money\">" + r.ownershipPercent.toFixed(2) + "%</td>" +
+          capHtml += "<tr><td>" + esc(r.name) + "</td><td>" + esc(r.role) + "</td><td class=\"col-money\">" + r.ownershipPercent.toFixed(2) + "%</td>" +
             '<td class="col-money">' + fmtMoney(r.totalContributed) + "</td><td class=\"col-money\">" + fmtMoney(r.totalDistributed) + "</td>" +
             '<td class="col-money">' + fmtMoney(r.netPosition) + "</td></tr>";
         });
-        html += "</tbody></table>";
+        capHtml += "</tbody></table>";
       }
+      var capTableDiv = document.createElement("div");
+      capTableDiv.className = "print-fit-section";
+      capTableDiv.setAttribute("data-fit-key", "capTable");
+      capTableDiv.innerHTML = capHtml;
+      wrap.appendChild(capTableDiv);
+      anyContent = true;
     }
 
-    if (!html) return null;
-    wrap.innerHTML = html;
+    if (!anyContent) return null;
     var select = wrap.querySelector("#drawSummarySelect");
     if (select) {
       select.addEventListener("change", function () {
@@ -943,7 +991,6 @@
 
   // ---------- print layout ----------
   var PAGE_SIZES_IN = { letter: [8.5, 11], a4: [8.27, 11.69], legal: [8.5, 14], tabloid: [11, 17] };
-  var FONT_SCALE = { small: 0.85, normal: 1, large: 1.2 };
   var ROW_PADDING_PX = { compact: 2, normal: 5, spacious: 9 };
   var printZoom = 100;
 
@@ -1015,9 +1062,11 @@
     document.body.appendChild(measureClone);
     var totalHeight = measureClone.scrollHeight;
 
-    var sectionMarkers = Array.from(measureClone.querySelectorAll(".cashflow-chart, .summary-section-header"))
-      .map(function (el) { return el.offsetTop; })
-      .sort(function (a, b) { return a - b; });
+    var sectionMarkers = settings.pageBreakPerSection
+      ? Array.from(measureClone.querySelectorAll(".print-section-boundary"))
+          .map(function (el) { return el.offsetTop; })
+          .sort(function (a, b) { return a - b; })
+      : [];
 
     var headerHeight = 0, headerCloneHtml = null, mainGridBottom = Infinity;
     if (settings.repeatHeader) {
@@ -1399,7 +1448,8 @@
   }
 
   // ---------- Cashflow (chart + monthly grid) ----------
-  function buildCashflowSection(summary, forcePrint) {
+  function buildCashflowSection(summary, forcePrint, sectionsFilter) {
+    var include = sectionsFilter || { cashflowGraph: true, cashflowTable: true };
     var wrap = document.createElement("div");
     wrap.className = "section";
 
@@ -1410,68 +1460,75 @@
     var thisMonth = currentMonthKey();
     function monthClass(m) { return highlightCurrentMonth && m === thisMonth ? " summary-grid__month--current" : ""; }
 
-    var showChart = forcePrint || !chartCollapsed;
-    var chartWrap = document.createElement("div");
-    chartWrap.className = "cashflow-chart";
-    chartWrap.innerHTML =
-      '<div class="cashflow-chart__header">' +
-        "<h3>Total Monthly Cashflow</h3>" +
-        (forcePrint ? "" : '<button class="link-button" id="chartCollapseBtn">' + (chartCollapsed ? "▸ expand" : "▾ collapse") + "</button>") +
-      "</div>";
-    if (showChart) {
-      chartWrap.appendChild(buildChart(summary.months, summary.grandTotal.monthly));
-    }
-    wrap.appendChild(chartWrap);
-
-    if (!forcePrint) {
-      var controlsWrap = document.createElement("div");
-      controlsWrap.className = "summary-grid-controls";
-      controlsWrap.innerHTML = '<button class="link-button" id="highlightMonthBtn">' + (highlightCurrentMonth ? "☑" : "☐") + " highlight current month</button>";
-      wrap.appendChild(controlsWrap);
+    if (include.cashflowGraph) {
+      var showChart = forcePrint || !chartCollapsed;
+      var chartWrap = document.createElement("div");
+      chartWrap.className = "cashflow-chart print-section-boundary print-fit-section";
+      chartWrap.setAttribute("data-fit-key", "cashflowGraph");
+      chartWrap.innerHTML =
+        '<div class="cashflow-chart__header">' +
+          "<h3>Total Monthly Cashflow</h3>" +
+          (forcePrint ? "" : '<button class="link-button" id="chartCollapseBtn">' + (chartCollapsed ? "▸ expand" : "▾ collapse") + "</button>") +
+        "</div>";
+      if (showChart) {
+        chartWrap.appendChild(buildChart(summary.months, summary.grandTotal.monthly));
+      }
+      wrap.appendChild(chartWrap);
     }
 
-    var gridWrap = document.createElement("div");
-    gridWrap.className = "summary-grid-wrap";
-    var html = '<table class="summary-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money summary-grid__budget">Budget</th>';
-    summary.months.forEach(function (m, i) { html += '<th class="col-money' + monthClass(m) + '"><span class="summary-grid__monthnum">Month ' + (i + 1) + '</span><span class="summary-grid__monthlabel">' + fmtMonth(m) + "</span></th>"; });
-    html += "</tr></thead><tbody>";
-    html += '<tr class="summary-grid__notes"><td class="summary-grid__label">Notes</td><td class="summary-grid__budget"></td>';
-    summary.months.forEach(function (m) {
-      html += '<td' + (monthClass(m) ? ' class="' + monthClass(m).trim() + '"' : "") + '><input class="summary-grid__notenote" data-note-month="' + m + '" value="' + esc(monthNotes[m] || "") + '" placeholder="—" /></td>';
-    });
-    html += "</tr>";
-    summary.categories.forEach(function (cat) {
-      html += '<tr class="summary-grid__category"><td class="summary-grid__label">' + esc(cat.name) + '</td><td class="summary-grid__budget"></td>';
-      summary.months.forEach(function (m) { html += '<td class="' + ("col-money" + monthClass(m)) + '"></td>'; });
+    if (include.cashflowTable) {
+      var tableSection = document.createElement("div");
+      tableSection.className = "cashflow-table-section print-section-boundary print-fit-section";
+      tableSection.setAttribute("data-fit-key", "cashflowTable");
+
+      if (!forcePrint) {
+        var controlsWrap = document.createElement("div");
+        controlsWrap.className = "summary-grid-controls";
+        controlsWrap.innerHTML = '<button class="link-button" id="highlightMonthBtn">' + (highlightCurrentMonth ? "☑" : "☐") + " highlight current month</button>";
+        tableSection.appendChild(controlsWrap);
+      }
+
+      var gridWrap = document.createElement("div");
+      gridWrap.className = "summary-grid-wrap";
+      var html = '<table class="summary-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money summary-grid__budget">Budget</th>';
+      summary.months.forEach(function (m, i) { html += '<th class="col-money' + monthClass(m) + '"><span class="summary-grid__monthnum">Month ' + (i + 1) + '</span><span class="summary-grid__monthlabel">' + fmtMonth(m) + "</span></th>"; });
+      html += "</tr></thead><tbody>";
+      html += '<tr class="summary-grid__notes"><td class="summary-grid__label">Notes</td><td class="summary-grid__budget"></td>';
+      summary.months.forEach(function (m) {
+        html += '<td' + (monthClass(m) ? ' class="' + monthClass(m).trim() + '"' : "") + '><input class="summary-grid__notenote" data-note-month="' + m + '" value="' + esc(monthNotes[m] || "") + '" placeholder="—" /></td>';
+      });
       html += "</tr>";
-      cat.lineItems.forEach(function (li) {
-        html += '<tr><td class="summary-grid__label">' + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
-        html += '<td class="col-money summary-grid__budget">' + fmtMoney(li.totalBudget) + "</td>";
-        summary.months.forEach(function (m) { html += '<td class="col-money' + monthClass(m) + '">' + (li.monthly[m] ? fmtMoney(li.monthly[m]) : "") + "</td>"; });
+      summary.categories.forEach(function (cat) {
+        html += '<tr class="summary-grid__category"><td class="summary-grid__label">' + esc(cat.name) + '</td><td class="summary-grid__budget"></td>';
+        summary.months.forEach(function (m) { html += '<td class="' + ("col-money" + monthClass(m)) + '"></td>'; });
+        html += "</tr>";
+        cat.lineItems.forEach(function (li) {
+          html += '<tr><td class="summary-grid__label">' + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
+          html += '<td class="col-money summary-grid__budget">' + fmtMoney(li.totalBudget) + "</td>";
+          summary.months.forEach(function (m) { html += '<td class="col-money' + monthClass(m) + '">' + (li.monthly[m] ? fmtMoney(li.monthly[m]) : "") + "</td>"; });
+          html += "</tr>";
+        });
+        html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money summary-grid__budget\">" + fmtMoney(cat.subtotalTotal) + "</td>";
+        summary.months.forEach(function (m) { html += '<td class="col-money' + monthClass(m) + '">' + (cat.subtotal[m] ? fmtMoney(cat.subtotal[m]) : "") + "</td>"; });
         html += "</tr>";
       });
-      html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money summary-grid__budget\">" + fmtMoney(cat.subtotalTotal) + "</td>";
-      summary.months.forEach(function (m) { html += '<td class="col-money' + monthClass(m) + '">' + (cat.subtotal[m] ? fmtMoney(cat.subtotal[m]) : "") + "</td>"; });
-      html += "</tr>";
-    });
-    html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money summary-grid__budget">' + fmtMoney(summary.grandTotal.total) + "</td>";
-    summary.months.forEach(function (m) { html += '<td class="col-money' + monthClass(m) + '">' + (summary.grandTotal.monthly[m] ? fmtMoney(summary.grandTotal.monthly[m]) : "") + "</td>"; });
-    html += "</tr></tbody></table>";
-    gridWrap.innerHTML = html;
-    wrap.appendChild(gridWrap);
+      html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money summary-grid__budget">' + fmtMoney(summary.grandTotal.total) + "</td>";
+      summary.months.forEach(function (m) { html += '<td class="col-money' + monthClass(m) + '">' + (summary.grandTotal.monthly[m] ? fmtMoney(summary.grandTotal.monthly[m]) : "") + "</td>"; });
+      html += "</tr></tbody></table>";
+      gridWrap.innerHTML = html;
+      tableSection.appendChild(gridWrap);
 
-    var labelCell = gridWrap.querySelector(".summary-grid__label");
-    if (labelCell) gridWrap.style.setProperty("--budget-col-left", labelCell.offsetWidth + "px");
+      var labelCell = gridWrap.querySelector(".summary-grid__label");
+      if (labelCell) gridWrap.style.setProperty("--budget-col-left", labelCell.offsetWidth + "px");
+
+      wrap.appendChild(tableSection);
+    }
 
     if (!forcePrint) {
-      wrap.querySelector("#chartCollapseBtn").addEventListener("click", function () {
-        chartCollapsed = !chartCollapsed;
-        render();
-      });
-      wrap.querySelector("#highlightMonthBtn").addEventListener("click", function () {
-        highlightCurrentMonth = !highlightCurrentMonth;
-        render();
-      });
+      var chartBtn = wrap.querySelector("#chartCollapseBtn");
+      if (chartBtn) chartBtn.addEventListener("click", function () { chartCollapsed = !chartCollapsed; render(); });
+      var highlightBtn = wrap.querySelector("#highlightMonthBtn");
+      if (highlightBtn) highlightBtn.addEventListener("click", function () { highlightCurrentMonth = !highlightCurrentMonth; render(); });
       wrap.querySelectorAll("[data-note-month]").forEach(function (input) {
         input.addEventListener("change", function () {
           monthNotes[input.getAttribute("data-note-month")] = input.value;
@@ -1520,7 +1577,8 @@
         drawsHtml += "</tbody></table>";
       }
       var drawsDiv = document.createElement("div");
-      drawsDiv.className = "section";
+      drawsDiv.className = "section print-fit-section";
+      drawsDiv.setAttribute("data-fit-key", "drawsList");
       drawsDiv.innerHTML = drawsHtml;
       wrap.appendChild(drawsDiv);
     }
@@ -1544,13 +1602,56 @@
     el.appendChild(buildSummarySection(summary, false));
   }
 
+  function applyFitScaling(wrap, settings, fit) {
+    var hasAnyFit = Object.keys(fit).some(function (k) { return fit[k] && fit[k] !== "none"; });
+    if (!hasAnyFit) return;
+    var dims = pageDimensionsPx(settings);
+
+    wrap.style.position = "absolute";
+    wrap.style.visibility = "hidden";
+    wrap.style.left = "-99999px";
+    wrap.style.width = dims.contentWidthPx + "px";
+    document.body.appendChild(wrap);
+
+    Array.from(wrap.querySelectorAll("[data-fit-key]")).forEach(function (el) {
+      var mode = fit[el.getAttribute("data-fit-key")];
+      if (!mode || mode === "none") return;
+      var naturalWidth = el.scrollWidth;
+      var naturalHeight = el.scrollHeight;
+      var factor = 1;
+      if (mode === "width" && naturalWidth > 0) factor = Math.min(1, dims.contentWidthPx / naturalWidth);
+      else if (mode === "height" && naturalHeight > 0) factor = Math.min(1, dims.contentHeightPx / naturalHeight);
+      if (factor < 1) {
+        var sizer = document.createElement("div");
+        sizer.style.width = (naturalWidth * factor) + "px";
+        sizer.style.height = (naturalHeight * factor) + "px";
+        sizer.style.overflow = "hidden";
+        el.style.width = naturalWidth + "px";
+        el.style.transform = "scale(" + factor + ")";
+        el.style.transformOrigin = "top left";
+        el.parentNode.insertBefore(sizer, el);
+        sizer.appendChild(el);
+      }
+    });
+
+    document.body.removeChild(wrap);
+    wrap.style.position = "";
+    wrap.style.visibility = "";
+    wrap.style.left = "";
+    wrap.style.width = "";
+  }
+
   function renderPrintableReport(el) {
     var summary = buildSummary(project);
     if (summary.months.length === 0) { el.appendChild(emptyScheduleSection()); return; }
     var wrap = document.createElement("div");
-    if (printSections.cashflow) wrap.appendChild(buildCashflowSection(summary, true));
+    if (printSections.cashflowGraph || printSections.cashflowTable) {
+      var cashflowWrap = buildCashflowSection(summary, true, printSections);
+      if (cashflowWrap.children.length) wrap.appendChild(cashflowWrap);
+    }
     var summaryWrap = buildSummarySection(summary, true, printSections);
     if (summaryWrap.children.length) wrap.appendChild(summaryWrap);
+    applyFitScaling(wrap, printSettings, printFit);
     var pages = buildPrintPages(wrap, printSettings);
     el.appendChild(pages);
     wrap.classList.add("print-real-content");
@@ -2182,7 +2283,8 @@
   }
   function applyPrintSettingsToDom() {
     document.body.classList.toggle("print-grayscale", printSettings.colorMode === "grayscale");
-    document.body.style.setProperty("--print-font-scale", String(FONT_SCALE[printSettings.fontSize]));
+    document.body.classList.toggle("pp-section-breaks", printSettings.pageBreakPerSection);
+    document.body.style.setProperty("--print-font-scale", String(printSettings.fontScalePercent / 100));
     document.body.style.setProperty("--print-row-padding", ROW_PADDING_PX[printSettings.rowSize] + "px");
     var styleEl = document.getElementById("dynamic-print-page");
     if (!styleEl) {
@@ -2190,9 +2292,15 @@
       styleEl.id = "dynamic-print-page";
       document.head.appendChild(styleEl);
     }
-    var footerLeft = cssContentString((project ? project.name : "") + " — generated " + (printGeneratedAt ? printGeneratedAt.toLocaleString() : ""));
+    var headerLeft = cssContentString(project ? project.name : "");
+    var footerLeft = cssContentString("Generated " + (printGeneratedAt ? printGeneratedAt.toLocaleString() : ""));
+    var topRight = printSettings.logoUrl
+      ? " @top-right { content: url(" + cssContentString(printSettings.logoUrl) + "); }"
+      : "";
     styleEl.textContent =
       "@page { size: " + pageCssSize(printSettings) + "; margin: " + marginCss(printSettings) + ";" +
+      " @top-left { content: " + headerLeft + "; font-size: 9px; font-weight: 700; color: #333; }" +
+      topRight +
       " @bottom-left { content: " + footerLeft + "; font-size: 8px; color: #666; }" +
       ' @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 8px; color: #666; }' +
       " }";
@@ -2248,14 +2356,30 @@
     printSettings.repeatHeader = e.target.checked;
     render();
   });
-  [["psCashflow", "cashflow"], ["psYearly", "yearly"], ["psDrawReport", "drawReport"], ["psCapTable", "capTable"], ["psDrawsList", "drawsList"]].forEach(function (pair) {
+  document.getElementById("ppPageBreakSections").addEventListener("change", function (e) {
+    printSettings.pageBreakPerSection = e.target.checked;
+    applyPrintSettingsToDom();
+    render();
+  });
+  document.getElementById("ppLogoUrl").addEventListener("change", function (e) {
+    printSettings.logoUrl = e.target.value.trim();
+    applyPrintSettingsToDom();
+    render();
+  });
+  [["psCashflowGraph", "cashflowGraph"], ["psCashflowTable", "cashflowTable"], ["psYearly", "yearly"], ["psDrawReport", "drawReport"], ["psCapTable", "capTable"], ["psDrawsList", "drawsList"]].forEach(function (pair) {
     document.getElementById(pair[0]).addEventListener("change", function (e) {
       printSections[pair[1]] = e.target.checked;
       render();
     });
   });
-  document.getElementById("ppFontSize").addEventListener("change", function (e) {
-    printSettings.fontSize = e.target.value;
+  [["pfCashflowGraph", "cashflowGraph"], ["pfCashflowTable", "cashflowTable"], ["pfYearly", "yearly"], ["pfDrawReport", "drawReport"], ["pfCapTable", "capTable"], ["pfDrawsList", "drawsList"]].forEach(function (pair) {
+    document.getElementById(pair[0]).addEventListener("change", function (e) {
+      printFit[pair[1]] = e.target.value;
+      render();
+    });
+  });
+  document.getElementById("ppFontScale").addEventListener("change", function (e) {
+    printSettings.fontScalePercent = Math.max(50, Math.min(200, Number(e.target.value) || 100));
     applyPrintSettingsToDom();
     render();
   });
