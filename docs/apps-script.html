@@ -21,6 +21,7 @@
     --banner: #fdf6e3;
     --banner-border: #eadfb4;
     --banner-text: #6b5b1e;
+    --year-shade: rgba(0, 0, 0, 0.035);
   }
   :root[data-theme="dark"] {
     --surface: #1a1a19;
@@ -38,6 +39,7 @@
     --banner: #2a2410;
     --banner-border: #4a3f16;
     --banner-text: #e0c869;
+    --year-shade: rgba(255, 255, 255, 0.045);
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -56,6 +58,7 @@
       --banner: #2a2410;
       --banner-border: #4a3f16;
       --banner-text: #e0c869;
+      --year-shade: rgba(255, 255, 255, 0.045);
     }
   }
 
@@ -207,6 +210,7 @@
   .summary-grid__grandtotal td { font-weight: 700; border-top: 2px solid var(--border-strong); font-size: 13.5px; }
   .summary-grid-controls { display: flex; justify-content: flex-end; margin-bottom: -8px; }
   .summary-grid td.summary-grid__month--current, .summary-grid th.summary-grid__month--current { background: var(--accent-bg) !important; }
+  .summary-grid__year-b { background: var(--year-shade); }
   .summary-grid__notes td { background: var(--surface); border-bottom: 2px solid var(--border-strong); }
   .summary-grid__notenote { width: 100%; min-width: 90px; border: 1px solid transparent; background: transparent; color: var(--text-secondary); font-size: 11px; font-style: italic; padding: 3px 4px; border-radius: 4px; }
   .summary-grid__notenote:hover, .summary-grid__notenote:focus { border-color: var(--border); font-style: normal; outline: none; }
@@ -261,6 +265,7 @@
 
   /* On-screen print preview (mirrors the @media print rules below, live) */
   .print-preview-bar { position: sticky; top: 0; z-index: 100; display: flex; flex-direction: column; gap: 8px; background: var(--accent); color: #fff; padding: 10px 24px; }
+  #ppSettingsPanel { display: flex; flex-direction: column; gap: 8px; }
   .print-preview-bar__row { display: flex; align-items: center; gap: 12px; }
   .print-preview-bar__settings { flex-wrap: wrap; font-size: 11px; }
   .print-preview-bar__settings label { display: flex; flex-direction: column; gap: 2px; opacity: 0.9; }
@@ -389,9 +394,11 @@
   <div class="print-preview-bar" id="printPreviewBar" style="display:none;">
     <div class="print-preview-bar__row">
       <span class="print-preview-bar__label">Print Preview</span>
+      <button id="ppSettingsToggleBtn" type="button">▾ Settings</button>
       <button id="ppPrintBtn" type="button">Print</button>
       <button id="ppExitBtn" type="button">Exit preview</button>
     </div>
+    <div id="ppSettingsPanel">
     <div class="print-preview-bar__row print-preview-bar__settings">
       <label>Page size
         <select id="ppPageSize">
@@ -470,6 +477,7 @@
         <select id="pfDrawsList"><option value="none">No fit</option><option value="width">Fit width</option><option value="height">Fit height</option></select>
       </div>
     </div>
+    </div>
   </div>
   <div class="signed-in-bar">
     <span id="connectionLabel">Connected</span>
@@ -523,6 +531,7 @@
   var summarySectionCollapsed = { drawsList: false, yearly: false, drawReport: false, capTable: false };
   var showDrawGenerator = false;
   var previewMode = false;
+  var printSettingsPanelCollapsed = false;
   var printSettings = {
     pageSize: "letter", orientation: "landscape",
     marginTopIn: 0.5, marginRightIn: 0.5, marginBottomIn: 0.5, marginLeftIn: 0.5,
@@ -1459,6 +1468,9 @@
     }
     var thisMonth = currentMonthKey();
     function monthClass(m) { return highlightCurrentMonth && m === thisMonth ? " summary-grid__month--current" : ""; }
+    var uniqueYears = Array.from(new Set(summary.months.map(yearOf)));
+    function yearShadeClass(m) { return uniqueYears.indexOf(yearOf(m)) % 2 === 1 ? " summary-grid__year-b" : ""; }
+    function colClass(m) { return monthClass(m) + yearShadeClass(m); }
 
     if (include.cashflowGraph) {
       var showChart = forcePrint || !chartCollapsed;
@@ -1491,29 +1503,29 @@
       var gridWrap = document.createElement("div");
       gridWrap.className = "summary-grid-wrap";
       var html = '<table class="summary-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money summary-grid__budget">Budget</th>';
-      summary.months.forEach(function (m, i) { html += '<th class="col-money' + monthClass(m) + '"><span class="summary-grid__monthnum">Month ' + (i + 1) + '</span><span class="summary-grid__monthlabel">' + fmtMonth(m) + "</span></th>"; });
+      summary.months.forEach(function (m, i) { html += '<th class="col-money' + colClass(m) + '"><span class="summary-grid__monthnum">Month ' + (i + 1) + '</span><span class="summary-grid__monthlabel">' + fmtMonth(m) + "</span></th>"; });
       html += "</tr></thead><tbody>";
       html += '<tr class="summary-grid__notes"><td class="summary-grid__label">Notes</td><td class="summary-grid__budget"></td>';
       summary.months.forEach(function (m) {
-        html += '<td' + (monthClass(m) ? ' class="' + monthClass(m).trim() + '"' : "") + '><input class="summary-grid__notenote" data-note-month="' + m + '" value="' + esc(monthNotes[m] || "") + '" placeholder="—" /></td>';
+        html += '<td' + (colClass(m) ? ' class="' + colClass(m).trim() + '"' : "") + '><input class="summary-grid__notenote" data-note-month="' + m + '" value="' + esc(monthNotes[m] || "") + '" placeholder="—" /></td>';
       });
       html += "</tr>";
       summary.categories.forEach(function (cat) {
         html += '<tr class="summary-grid__category"><td class="summary-grid__label">' + esc(cat.name) + '</td><td class="summary-grid__budget"></td>';
-        summary.months.forEach(function (m) { html += '<td class="' + ("col-money" + monthClass(m)) + '"></td>'; });
+        summary.months.forEach(function (m) { html += '<td class="' + ("col-money" + colClass(m)) + '"></td>'; });
         html += "</tr>";
         cat.lineItems.forEach(function (li) {
           html += '<tr><td class="summary-grid__label">' + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
           html += '<td class="col-money summary-grid__budget">' + fmtMoney(li.totalBudget) + "</td>";
-          summary.months.forEach(function (m) { html += '<td class="col-money' + monthClass(m) + '">' + (li.monthly[m] ? fmtMoney(li.monthly[m]) : "") + "</td>"; });
+          summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (li.monthly[m] ? fmtMoney(li.monthly[m]) : "") + "</td>"; });
           html += "</tr>";
         });
         html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money summary-grid__budget\">" + fmtMoney(cat.subtotalTotal) + "</td>";
-        summary.months.forEach(function (m) { html += '<td class="col-money' + monthClass(m) + '">' + (cat.subtotal[m] ? fmtMoney(cat.subtotal[m]) : "") + "</td>"; });
+        summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (cat.subtotal[m] ? fmtMoney(cat.subtotal[m]) : "") + "</td>"; });
         html += "</tr>";
       });
       html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money summary-grid__budget">' + fmtMoney(summary.grandTotal.total) + "</td>";
-      summary.months.forEach(function (m) { html += '<td class="col-money' + monthClass(m) + '">' + (summary.grandTotal.monthly[m] ? fmtMoney(summary.grandTotal.monthly[m]) : "") + "</td>"; });
+      summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (summary.grandTotal.monthly[m] ? fmtMoney(summary.grandTotal.monthly[m]) : "") + "</td>"; });
       html += "</tr></tbody></table>";
       gridWrap.innerHTML = html;
       tableSection.appendChild(gridWrap);
@@ -2305,12 +2317,16 @@
       ' @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 8px; color: #666; }' +
       " }";
   }
+  function updateSettingsPanelToggle() {
+    document.getElementById("ppSettingsPanel").style.display = printSettingsPanelCollapsed ? "none" : "flex";
+    document.getElementById("ppSettingsToggleBtn").textContent = (printSettingsPanelCollapsed ? "▸" : "▾") + " Settings";
+  }
   function setPreviewMode(on) {
     previewMode = on;
     if (on) printGeneratedAt = new Date();
     document.body.classList.toggle("print-preview-mode", on);
     document.getElementById("printPreviewBar").style.display = on ? "flex" : "none";
-    if (on) applyPrintSettingsToDom();
+    if (on) { applyPrintSettingsToDom(); updateSettingsPanelToggle(); }
     render();
   }
   document.getElementById("printBtn").addEventListener("click", function () {
@@ -2321,6 +2337,10 @@
   });
   document.getElementById("ppPrintBtn").addEventListener("click", function () {
     window.print();
+  });
+  document.getElementById("ppSettingsToggleBtn").addEventListener("click", function () {
+    printSettingsPanelCollapsed = !printSettingsPanelCollapsed;
+    updateSettingsPanelToggle();
   });
   document.getElementById("ppPageSize").addEventListener("change", function (e) {
     printSettings.pageSize = e.target.value;
