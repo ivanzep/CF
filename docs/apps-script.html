@@ -1134,12 +1134,83 @@
       });
     }
 
+    // A fit-height table that's still too wide once scaled gets split into column
+    // chunks: the label/budget columns repeat on every chunk, and each chunk gets its
+    // own page (forceNewPage), so the extra columns "continue" instead of being clipped.
+    function pushFitHeightChunks(section) {
+      var table = section.querySelector("table");
+      var headRow = table ? table.querySelector("thead tr") : null;
+      var bodyEl = table ? table.querySelector("tbody") : null;
+      var bodyRows = bodyEl ? Array.from(bodyEl.children) : [];
+      if (!headRow || bodyRows.length === 0) {
+        units.push({ type: "atomic", html: section.outerHTML, height: section.offsetHeight, sectionStart: true });
+        return;
+      }
+      var headCells = Array.from(headRow.children);
+      var colWidths = headCells.map(function (c) { return c.offsetWidth; });
+      var tableHeight = table.offsetHeight;
+      var sectionHeight = section.offsetHeight;
+      var factor = Math.min(1, dims.contentHeightPx / sectionHeight);
+
+      var FROZEN = Math.min(2, colWidths.length);
+      var frozenWidth = colWidths.slice(0, FROZEN).reduce(function (a, b) { return a + b; }, 0);
+
+      var chunks = [];
+      var current = [];
+      var currentWidth = frozenWidth;
+      colWidths.slice(FROZEN).forEach(function (w, i) {
+        var idx = FROZEN + i;
+        if (current.length > 0 && (currentWidth + w) * factor > dims.contentWidthPx) {
+          chunks.push(current);
+          current = [];
+          currentWidth = frozenWidth;
+        }
+        current.push(idx);
+        currentWidth += w;
+      });
+      chunks.push(current);
+
+      var tableWrapper = Array.from(section.children).filter(function (c) { return isTableWrapper(c); })[0];
+      var preambleHtml = Array.from(section.children)
+        .filter(function (c) { return c !== table && c !== tableWrapper; })
+        .map(function (c) { return c.outerHTML; })
+        .join("");
+
+      chunks.forEach(function (dataIdxs, chunkIndex) {
+        var idxs = [];
+        for (var i = 0; i < FROZEN; i++) idxs.push(i);
+        idxs = idxs.concat(dataIdxs);
+        var theadHtml = "<thead><tr>" + idxs.map(function (i) { return headCells[i].outerHTML; }).join("") + "</tr></thead>";
+        var tbodyHtml = "<tbody>" + bodyRows.map(function (tr) {
+          var cells = Array.from(tr.children);
+          return '<tr class="' + tr.className + '">' + idxs.map(function (i) { return cells[i] ? cells[i].outerHTML : "<td></td>"; }).join("") + "</tr>";
+        }).join("") + "</tbody>";
+        var chunkTableHtml = '<table class="' + table.className + '">' + theadHtml + tbodyHtml + "</table>";
+        var chunkWidth = idxs.reduce(function (a, i) { return a + colWidths[i]; }, 0);
+
+        var bodyHtml = (chunkIndex === 0 ? preambleHtml : "") + (tableWrapper ? '<div class="' + tableWrapper.className + '">' + chunkTableHtml + "</div>" : chunkTableHtml);
+        var unscaledHeight = chunkIndex === 0 ? sectionHeight : tableHeight;
+        var scaledHeight = unscaledHeight * factor;
+        var html =
+          '<div style="width:' + Math.ceil(chunkWidth * factor) + "px;height:" + Math.ceil(scaledHeight) + 'px;overflow:hidden;">' +
+            '<div class="' + section.className + '" style="width:' + chunkWidth + "px;transform:scale(" + factor + ");transform-origin:top left;\">" +
+              bodyHtml +
+            "</div>" +
+          "</div>";
+
+        units.push({ type: "atomic", html: html, height: scaledHeight, sectionStart: chunkIndex === 0, forceNewPage: chunkIndex > 0 });
+      });
+    }
+
     Array.from(measureClone.querySelectorAll(".print-fit-section")).forEach(function (section) {
+      if (section.getAttribute("data-fit-chunk") === "1") {
+        pushFitHeightChunks(section);
+        return;
+      }
       // Fit-scaled sections (transform:scale applied by applyFitScaling) keep their old
       // all-or-nothing placement: splitting a scaled section into fresh per-row table
       // fragments would silently drop the scaling, since the transform lives on the
-      // section wrapper, not on the individual rows/tables inside it. Horizontal overflow
-      // for fit-height sections is handled separately (continuation pages), not here.
+      // section wrapper, not on the individual rows/tables inside it.
       if (section.style.transform) {
         var sizer = section.parentElement && section.parentElement.children.length === 1 ? section.parentElement : section;
         units.push({ type: "atomic", html: sizer.outerHTML, height: sizer.offsetHeight, sectionStart: true });
@@ -1217,7 +1288,8 @@
     }
 
     units.forEach(function (u) {
-      if (settings.pageBreakPerSection && u.sectionStart && !pageIsEmpty) newPage();
+      if (u.forceNewPage && !pageIsEmpty) newPage();
+      else if (settings.pageBreakPerSection && u.sectionStart && !pageIsEmpty) newPage();
 
       if (u.type === "atomic") {
         if (u.height > remaining && !pageIsEmpty) newPage();
@@ -1749,6 +1821,14 @@
       if (mode === "width" && naturalWidth > 0) factor = Math.min(1, dims.contentWidthPx / naturalWidth);
       else if (mode === "height" && naturalHeight > 0) factor = Math.min(1, dims.contentHeightPx / naturalHeight);
       if (factor < 1) {
+        // A height-fit table can still be wider than the page once scaled (scaling is
+        // uniform, so shrinking to fit height doesn't guarantee the width fits too).
+        // Leave those untouched here — buildPrintPages splits them into column chunks
+        // (with the label/budget columns repeated) that each get their own page instead.
+        if (mode === "height" && naturalWidth * factor > dims.contentWidthPx + 0.5 && el.querySelector("table")) {
+          el.setAttribute("data-fit-chunk", "1");
+          return;
+        }
         var sizer = document.createElement("div");
         sizer.style.width = (naturalWidth * factor) + "px";
         sizer.style.height = (naturalHeight * factor) + "px";
