@@ -2,7 +2,7 @@
 
 A JSON API backed by a Google Sheet you pick, deployed as an Apps Script
 web app. **No Google Cloud Console, no OAuth Client ID.** The UI is a
-separate static page — [`docs/apps-script.html`](../docs/apps-script.html)
+separate static page — [`docs/apps-script-v0.2.html`](../docs/apps-script-v0.2.html)
 — that you can host anywhere, including GitHub Pages; it talks to this
 backend over plain HTTP.
 
@@ -40,7 +40,7 @@ already use.
      Google permission prompt — there's no separate Cloud Console project
      to create.
 5. Copy the **Web app URL** it gives you (ends in `/exec`).
-6. Open [`docs/apps-script.html`](../docs/apps-script.html) (locally, or
+6. Open [`docs/apps-script-v0.2.html`](../docs/apps-script-v0.2.html) (locally, or
    wherever you've hosted it — see that file's section in the
    [docs README](../docs/README.md)), paste the URL into **Connect your
    Apps Script backend**, and click **Connect**.
@@ -51,7 +51,7 @@ already use.
 app responses don't carry CORS headers, so a browser calling this API with
 `fetch()` from a different origin gets a network-level error ("Load
 failed" / "Failed to fetch") even though the request executes fine
-server-side. `Code.gs` and `docs/apps-script.html` now talk to each other
+server-side. `Code.gs` and `docs/apps-script-v0.2.html` now talk to each other
 using two techniques that are exempt from CORS entirely — a `<script>` tag
 (JSONP) for reads, a hidden `<form>`/`<iframe>` submission for writes — so
 if you deployed an earlier version, **copy the current `Code.gs` into the
@@ -78,7 +78,7 @@ For a bit more protection, set a **Script Property** named `API_TOKEN`
 (Project Settings → Script Properties → Add script property) to any random
 string. Once set, every request must include a matching token or it's
 rejected with "Unauthorized." Enter the same value in the **Shared token**
-field on the `docs/apps-script.html` setup screen.
+field on the `docs/apps-script-v0.2.html` setup screen.
 
 ## Updating the code later
 

@@ -209,6 +209,11 @@
   .summary-grid__subtotal td { font-weight: 600; border-top: 1px solid var(--border-strong); }
   .summary-grid__grandtotal td { font-weight: 700; border-top: 2px solid var(--border-strong); font-size: 13.5px; }
   .summary-grid-controls { display: flex; justify-content: flex-end; margin-bottom: -8px; }
+  .summary-grid__expand-toggle { background: none; border: none; cursor: pointer; padding: 0 6px 0 0; color: var(--text-muted); font-size: 10px; vertical-align: middle; }
+  .summary-grid__expand-toggle:hover { color: var(--text-primary); }
+  .summary-grid__budgetline td { color: var(--text-muted); font-size: 11.5px; font-weight: 400 !important; }
+  .summary-grid__budgetline td.summary-grid__label, .summary-grid__budgetline td.summary-grid__budget { background: var(--surface); }
+  .summary-grid__budgetline-desc { padding-left: 20px; }
   .summary-grid td.summary-grid__month--current, .summary-grid th.summary-grid__month--current { background: var(--accent-bg) !important; }
   .summary-grid__year-b { background: var(--year-shade); }
   .summary-grid__notes td { background: var(--surface); border-bottom: 2px solid var(--border-strong); }
@@ -544,6 +549,7 @@
   var activeTab = "summary";
   var expandedLineItemId = null;
   var expandedBudgetItemId = null;
+  var expandedCashflowLineItemIds = {};
   var expandedMemberId = null;
   var chartCollapsed = true;
   var projectHeaderCollapsed = true;
@@ -1433,10 +1439,11 @@
     var budgetItems = proj.budgetItems || [];
     var itemsWithSchedule = proj.lineItems.map(function (li) {
       var linked = budgetItems.filter(function (bi) { return bi.linkedLineItemId === li.id; });
-      if (linked.length === 0) return { li: li, schedule: getLineItemSchedule(li), effectiveBudget: li.totalBudget, linkedCount: 0 };
+      if (linked.length === 0) return { li: li, schedule: getLineItemSchedule(li), effectiveBudget: li.totalBudget, linkedCount: 0, linkedItems: [] };
       return {
         li: li, schedule: mergeSchedules(linked.map(getLineItemSchedule)),
         effectiveBudget: sum(linked.map(function (bi) { return bi.totalBudget; })), linkedCount: linked.length,
+        linkedItems: linked,
       };
     });
     var minKey = null, maxKey = null;
@@ -1462,7 +1469,10 @@
       if (items.length === 0) return null;
       var lineItems = items.map(function (x) {
         return { id: x.li.id, code: x.li.code, description: x.li.description, totalBudget: x.effectiveBudget,
-          scheduleMode: x.li.scheduleMode, monthly: monthlyMapFor(x.schedule), linkedBudgetCount: x.linkedCount };
+          scheduleMode: x.li.scheduleMode, monthly: monthlyMapFor(x.schedule), linkedBudgetCount: x.linkedCount,
+          linkedBudgetItems: x.linkedItems.map(function (bi) {
+            return { id: bi.id, description: bi.description, totalBudget: bi.totalBudget, monthly: monthlyMapFor(getLineItemSchedule(bi)) };
+          }) };
       });
       var subtotal = {}, subtotalTotal = 0;
       lineItems.forEach(function (lo) {
@@ -1729,10 +1739,23 @@
         summary.months.forEach(function (m) { html += '<td class="' + ("col-money" + colClass(m)) + '"></td>'; });
         html += "</tr>";
         cat.lineItems.forEach(function (li) {
-          html += '<tr><td class="summary-grid__label">' + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
+          var hasLinked = li.linkedBudgetItems && li.linkedBudgetItems.length > 0;
+          var isExpanded = hasLinked && !!expandedCashflowLineItemIds[li.id];
+          var toggle = (!forcePrint && hasLinked)
+            ? '<button class="link-button summary-grid__expand-toggle" data-toggle-cf-expand="' + li.id + '">' + (isExpanded ? "▾" : "▸") + "</button>"
+            : "";
+          html += '<tr><td class="summary-grid__label">' + toggle + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
           html += '<td class="col-money summary-grid__budget">' + fmtMoney(li.totalBudget) + "</td>";
           summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (li.monthly[m] ? fmtMoney(li.monthly[m]) : "") + "</td>"; });
           html += "</tr>";
+          if (!forcePrint && isExpanded) {
+            li.linkedBudgetItems.forEach(function (bi) {
+              html += '<tr class="summary-grid__budgetline"><td class="summary-grid__label summary-grid__budgetline-desc">' + esc(bi.description) + "</td>";
+              html += '<td class="col-money summary-grid__budget">' + fmtMoney(bi.totalBudget) + "</td>";
+              summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (bi.monthly[m] ? fmtMoney(bi.monthly[m]) : "") + "</td>"; });
+              html += "</tr>";
+            });
+          }
         });
         html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money summary-grid__budget\">" + fmtMoney(cat.subtotalTotal) + "</td>";
         summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (cat.subtotal[m] ? fmtMoney(cat.subtotal[m]) : "") + "</td>"; });
@@ -1759,6 +1782,14 @@
         input.addEventListener("change", function () {
           monthNotes[input.getAttribute("data-note-month")] = input.value;
           saveMonthNotesFor(project.id, monthNotes);
+        });
+      });
+      wrap.querySelectorAll("[data-toggle-cf-expand]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var id = btn.getAttribute("data-toggle-cf-expand");
+          if (expandedCashflowLineItemIds[id]) delete expandedCashflowLineItemIds[id];
+          else expandedCashflowLineItemIds[id] = true;
+          render();
         });
       });
     }

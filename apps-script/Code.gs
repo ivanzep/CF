@@ -4,7 +4,7 @@
  * Bind this script to a Google Sheet (Extensions > Apps Script), deploy it
  * as a web app (Deploy > New deployment > Web app, access: Anyone), and
  * use the resulting /exec URL as the API endpoint for the static frontend
- * in docs/apps-script.html (hosted separately, e.g. on GitHub Pages). All
+ * in docs/apps-script-v0.2.html (hosted separately, e.g. on GitHub Pages). All
  * data lives in tabs on the bound spreadsheet.
  *
  * Apps Script web app responses don't carry CORS headers, so a visiting

@@ -26,7 +26,7 @@ Lets you:
 
 There are four ways to run this tool — pick one:
 
-| | `frontend/` (this doc) | [`docs/index.html`](./docs/README.md) | [`docs/apps-script.html`](./docs/README.md) | [`apps-script/`](./apps-script/README.md) |
+| | `frontend/` (this doc) | [`docs/index.html`](./docs/README.md) | [`docs/apps-script-v0.2.html`](./docs/README.md) | [`apps-script/`](./apps-script/README.md) |
 |---|---|---|---|---|
 | Data lives in | Google Sheets, via its API | Google Sheets, via its API | Google Sheets, via an Apps Script web app | Google Sheets, via an Apps Script web app |
 | Google Cloud Console needed? | Yes (OAuth Client ID) | Yes (OAuth Client ID) | **No** | **No** |
@@ -35,14 +35,14 @@ There are four ways to run this tool — pick one:
 | Best for | The React codebase, if you want to keep developing it | Same experience, zero build step | No Cloud Console, UI hosted separately from the sheet | No Cloud Console, simplest possible setup |
 
 `frontend/` and `docs/index.html` are the same OAuth-based app, built two
-different ways. `docs/apps-script.html` is a separate static UI that talks
+different ways. `docs/apps-script-v0.2.html` is a separate static UI that talks
 to the `apps-script/` backend over plain HTTP instead of calling Google
 Sheets directly — no OAuth Client ID at all, at the cost of the backend
 needing to allow unauthenticated requests (see
 [`apps-script/README.md`'s Security section](./apps-script/README.md#security)).
 A GitHub Pages site can only run one *source* at a time (pick it in repo
 Settings → Pages). This repo's Pages source is **Deploy from a branch**
-(`main`, `/docs`), which serves `docs/index.html` and `docs/apps-script.html`
+(`main`, `/docs`), which serves `docs/index.html` and `docs/apps-script-v0.2.html`
 from that same source — `frontend/` is not auto-deployed (see below).
 
 The rest of this document covers the React/`frontend/` version. See
