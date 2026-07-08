@@ -8,9 +8,10 @@ backend over plain HTTP.
 
 The spreadsheet holds all the data (tabs: `Project`, `Categories`,
 `LineItems`, `Payments`, `Draws`, `CapTable`, `Contributions`,
-`Distributions`), created automatically the first time the script runs —
-added alongside whatever else is already in the sheet, so this works on a
-brand-new sheet or one you already use.
+`Distributions`, `BudgetSections`, `BudgetItems`, `BudgetPayments`), created
+automatically the first time the script runs — added alongside whatever
+else is already in the sheet, so this works on a brand-new sheet or one you
+already use.
 
 ## Setup (about 3 minutes)
 

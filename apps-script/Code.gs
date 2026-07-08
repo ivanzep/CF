@@ -42,6 +42,9 @@ var TAB_SCHEMA = {
   CapTable: ["id", "name", "role", "ownershipPercent", "sortOrder"],
   Contributions: ["id", "memberId", "date", "amount", "note"],
   Distributions: ["id", "memberId", "date", "amount", "note"],
+  BudgetSections: ["id", "name", "sortOrder"],
+  BudgetItems: ["id", "sectionId", "description", "linkedLineItemId", "totalBudget", "scheduleMode", "startDate", "endDate", "sortOrder"],
+  BudgetPayments: ["id", "budgetItemId", "date", "amount"],
 };
 
 // 1-indexed column numbers that hold dates, per tab. Formatted as plain
@@ -53,6 +56,8 @@ var DATE_COLUMNS = {
   Draws: [3],
   Contributions: [3],
   Distributions: [3],
+  BudgetItems: [7, 8],
+  BudgetPayments: [3],
 };
 
 function doGet(e) {
@@ -245,6 +250,27 @@ function getProject() {
     if (m) m.distributions.push({ id: str_(row[0]), date: str_(row[2]), amount: num_(row[3]), note: strOrNull_(row[4]) });
   });
 
+  var budgetItems = readTab_("BudgetItems").map(function (row) {
+    return {
+      id: str_(row[0]),
+      sectionId: strOrNull_(row[1]),
+      description: str_(row[2]),
+      linkedLineItemId: strOrNull_(row[3]),
+      totalBudget: num_(row[4]),
+      scheduleMode: str_(row[5]) || "EVEN",
+      startDate: strOrNull_(row[6]),
+      endDate: strOrNull_(row[7]),
+      sortOrder: num_(row[8]),
+      payments: [],
+    };
+  });
+  var budgetItemsById = {};
+  budgetItems.forEach(function (bi) { budgetItemsById[bi.id] = bi; });
+  readTab_("BudgetPayments").forEach(function (row) {
+    var bi = budgetItemsById[str_(row[1])];
+    if (bi) bi.payments.push({ id: str_(row[0]), date: str_(row[2]), amount: num_(row[3]) });
+  });
+
   return {
     id: getSs_().getId(),
     name: str_(projectRow[1]) || "Untitled Project",
@@ -260,6 +286,10 @@ function getProject() {
       return { id: str_(row[0]), name: str_(row[1]), date: str_(row[2]), amount: num_(row[3]), source: strOrNull_(row[4]), sortOrder: num_(row[5]) };
     }),
     capTable: capTable,
+    budgetSections: readTab_("BudgetSections").map(function (row) {
+      return { id: str_(row[0]), name: str_(row[1]), sortOrder: num_(row[2]) };
+    }),
+    budgetItems: budgetItems,
   };
 }
 
@@ -282,6 +312,13 @@ function saveProject(project) {
   }, []));
   writeTab_("Distributions", project.capTable.reduce(function (acc, m) {
     return acc.concat(m.distributions.map(function (d) { return [d.id, m.id, d.date, d.amount, d.note || ""]; }));
+  }, []));
+  writeTab_("BudgetSections", (project.budgetSections || []).map(function (s) { return [s.id, s.name, s.sortOrder]; }));
+  writeTab_("BudgetItems", (project.budgetItems || []).map(function (bi) {
+    return [bi.id, bi.sectionId || "", bi.description, bi.linkedLineItemId || "", bi.totalBudget, bi.scheduleMode, bi.startDate || "", bi.endDate || "", bi.sortOrder];
+  }));
+  writeTab_("BudgetPayments", (project.budgetItems || []).reduce(function (acc, bi) {
+    return acc.concat(bi.payments.map(function (p) { return [p.id, bi.id, p.date, p.amount]; }));
   }, []));
 
   return true;
@@ -331,6 +368,10 @@ function loadExampleData() {
   project.lineItems = lineItems;
   project.draws = draws;
   project.capTable = capTable;
+  // Line items get fresh ids above, so any existing budget items' links would
+  // point at ids that no longer exist — reset budget data along with everything else.
+  project.budgetSections = [];
+  project.budgetItems = [];
 
   saveProject(project);
   return project;

@@ -2,7 +2,7 @@
 <html>
 <head>
 <base target="_top">
-<title>Cashflow Tracker V0.2</title>
+<title>Cashflow Tracker V0.1</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
   :root {
@@ -543,7 +543,6 @@
   var project = null;
   var activeTab = "summary";
   var expandedLineItemId = null;
-  var expandedBudgetItemId = null;
   var expandedMemberId = null;
   var chartCollapsed = true;
   var projectHeaderCollapsed = true;
@@ -700,15 +699,8 @@
       showToast("Save failed: " + err.message);
     });
   }
-  // Defensive against a backend that hasn't been redeployed with the newer Code.gs yet
-  // (an old deployment's getProject() response simply won't have these fields).
-  function normalizeProject(p) {
-    if (!p.budgetSections) p.budgetSections = [];
-    if (!p.budgetItems) p.budgetItems = [];
-    return p;
-  }
   function applyLoadedProject(p) {
-    project = normalizeProject(p);
+    project = p;
     isDirty = false;
     updateSaveIndicator();
     var isEmpty = project.categories.length === 0 && project.lineItems.length === 0 &&
@@ -751,7 +743,7 @@
     document.getElementById("startBlankBtn").addEventListener("click", function () { render(); });
     document.getElementById("loadExampleBtn").addEventListener("click", function () {
       el.innerHTML = '<p class="section__intro">Loading example data…</p>';
-      callApi("loadExampleData").then(function (p) { project = normalizeProject(p); render(); }).catch(function (err) {
+      callApi("loadExampleData").then(function (p) { project = p; render(); }).catch(function (err) {
         alert("Failed to load example data: " + err.message);
       });
     });
@@ -1419,26 +1411,8 @@
     });
   }
 
-  // Budget items share the same {scheduleMode, payments, startDate, endDate, totalBudget}
-  // shape as line items, so getLineItemSchedule() works on either.
-  function mergeSchedules(scheduleArrays) {
-    var map = {};
-    scheduleArrays.forEach(function (sched) {
-      sched.forEach(function (b) { map[b.date] = round2((map[b.date] || 0) + b.amount); });
-    });
-    return Object.keys(map).sort().map(function (d) { return { date: d, amount: map[d] }; });
-  }
-
   function buildSummary(proj) {
-    var budgetItems = proj.budgetItems || [];
-    var itemsWithSchedule = proj.lineItems.map(function (li) {
-      var linked = budgetItems.filter(function (bi) { return bi.linkedLineItemId === li.id; });
-      if (linked.length === 0) return { li: li, schedule: getLineItemSchedule(li), effectiveBudget: li.totalBudget, linkedCount: 0 };
-      return {
-        li: li, schedule: mergeSchedules(linked.map(getLineItemSchedule)),
-        effectiveBudget: sum(linked.map(function (bi) { return bi.totalBudget; })), linkedCount: linked.length,
-      };
-    });
+    var itemsWithSchedule = proj.lineItems.map(function (li) { return { li: li, schedule: getLineItemSchedule(li) }; });
     var minKey = null, maxKey = null;
     function consider(iso) {
       var p = iso.split("-").map(Number), k = p[0] * 12 + (p[1] - 1);
@@ -1461,8 +1435,8 @@
       var items = itemsWithSchedule.filter(function (x) { return x.li.categoryId === cat.id; });
       if (items.length === 0) return null;
       var lineItems = items.map(function (x) {
-        return { id: x.li.id, code: x.li.code, description: x.li.description, totalBudget: x.effectiveBudget,
-          scheduleMode: x.li.scheduleMode, monthly: monthlyMapFor(x.schedule), linkedBudgetCount: x.linkedCount };
+        return { id: x.li.id, code: x.li.code, description: x.li.description, totalBudget: x.li.totalBudget,
+          scheduleMode: x.li.scheduleMode, monthly: monthlyMapFor(x.schedule) };
       });
       var subtotal = {}, subtotalTotal = 0;
       lineItems.forEach(function (lo) {
@@ -1599,7 +1573,7 @@
       el.className = "project-header project-header--collapsed";
       el.innerHTML =
         '<span class="project-header__collapsed-left">' +
-          '<span class="project-header__brand">Cashflow Tracker</span>' +
+          '<span class="project-header__brand">Cashflow Tracker V0.1</span>' +
           '<span class="project-header__collapsed-name">' + esc(project.name || "Untitled project") + "</span>" +
         "</span>" +
         '<button class="link-button" id="projectHeaderExpandBtn">▸ expand</button>';
@@ -1611,7 +1585,7 @@
     }
     el.className = "project-header";
     el.innerHTML =
-      '<span class="project-header__brand">Cashflow Tracker</span>' +
+      '<span class="project-header__brand">Cashflow Tracker V0.1</span>' +
       '<div class="project-header__top">' +
         '<input class="editable-text project-header__name" ' +
           'value="' + esc(project.name) + '" data-bind="project.name" />' +
@@ -1648,7 +1622,7 @@
   function renderTabs() {
     var tabs = [
       ["summary", "Summary"], ["cashflow", "Cashflow"], ["line-items", "Line Items"],
-      ["budget", "Budget"], ["draws", "Draws"], ["cap-table", "Cap Table"],
+      ["draws", "Draws"], ["cap-table", "Cap Table"],
     ];
     document.getElementById("tabs").innerHTML = tabs.map(function (t) {
       return '<button class="tab' + (activeTab === t[0] ? " tab--active" : "") + '" data-tab="' + t[0] + '">' + t[1] + "</button>";
@@ -1665,7 +1639,6 @@
     if (activeTab === "cashflow") renderCashflowTab(el);
     else if (activeTab === "summary") renderSummaryTab(el);
     else if (activeTab === "line-items") renderLineItemsTab(el);
-    else if (activeTab === "budget") renderBudgetTab(el);
     else if (activeTab === "draws") renderDrawsTab(el);
     else if (activeTab === "cap-table") renderCapTableTab(el);
   }
@@ -1956,12 +1929,6 @@
   }
 
   // ---------- Line Items ----------
-  function linkedBudgetItemsFor(li) { return project.budgetItems.filter(function (bi) { return bi.linkedLineItemId === li.id; }); }
-  function effectiveLineItemBudget(li) {
-    var linked = linkedBudgetItemsFor(li);
-    return linked.length ? sum(linked.map(function (bi) { return bi.totalBudget; })) : li.totalBudget;
-  }
-
   function renderLineItemsTab(el) {
     var wrap = document.createElement("div");
     wrap.className = "section";
@@ -1974,7 +1941,7 @@
     groups.forEach(function (group) {
       var groupEl = document.createElement("div");
       groupEl.className = "category-group";
-      var total = sum(group.items.map(effectiveLineItemBudget));
+      var total = sum(group.items.map(function (i) { return i.totalBudget; }));
       var headerHtml = '<div class="category-group__header">';
       if (group.id) {
         headerHtml += '<input class="editable-text category-group__title" value="' + esc(group.name) + '" data-cat-rename="' + group.id + '" />';
@@ -2011,9 +1978,6 @@
   }
 
   function lineItemRowHtml(li) {
-    var linked = linkedBudgetItemsFor(li);
-    var isOverridden = linked.length > 0;
-    var effectiveBudget = effectiveLineItemBudget(li);
     var schedule = getLineItemSchedule(li);
     var summary = li.scheduleMode === "EVEN"
       ? (li.startDate && li.endDate ? "Even, " + li.startDate + " → " + li.endDate : "Even (set dates)")
@@ -2021,21 +1985,15 @@
     var catOptions = '<option value="">Uncategorized</option>' + project.categories.map(function (c) {
       return '<option value="' + c.id + '"' + (li.categoryId === c.id ? " selected" : "") + ">" + esc(c.name) + "</option>";
     }).join("");
-    var linkedNote = isOverridden ? " — " + linked.length + " linked budget line" + (linked.length === 1 ? "" : "s") : "";
-    var budgetCell = isOverridden
-      ? '<td class="col-money"><input type="number" class="editable-number" value="' + round2(effectiveBudget) + '" disabled title="Driven by ' + linked.length + ' linked budget line' + (linked.length === 1 ? "" : "s") + " — edit on the Budget tab\" /></td>"
-      : '<td class="col-money"><input type="number" class="editable-number" value="' + li.totalBudget + '" data-item-field="totalBudget" data-item-id="' + li.id + '" /></td>';
-    var scheduleCell = isOverridden
-      ? '<td class="col-schedule"><span class="schedule-editor__hint">Set on Budget tab' + linkedNote + "</span></td>"
-      : '<td class="col-schedule"><button class="link-button" data-toggle-schedule="' + li.id + '">' + (expandedLineItemId === li.id ? "▾ " : "▸ ") + esc(summary) + "</button></td>";
     var rows = '<tr data-item-row="' + li.id + '">' +
       '<td class="col-code"><input class="editable-text" value="' + esc(li.code || "") + '" data-item-field="code" data-item-id="' + li.id + '" /></td>' +
       '<td><input class="editable-text" value="' + esc(li.description) + '" data-item-field="description" data-item-id="' + li.id + '" />' +
       '<select class="category-select" data-item-field="categoryId" data-item-id="' + li.id + '">' + catOptions + "</select></td>" +
-      budgetCell + scheduleCell +
+      '<td class="col-money"><input type="number" class="editable-number" value="' + li.totalBudget + '" data-item-field="totalBudget" data-item-id="' + li.id + '" /></td>' +
+      '<td class="col-schedule"><button class="link-button" data-toggle-schedule="' + li.id + '">' + (expandedLineItemId === li.id ? "▾ " : "▸ ") + esc(summary) + "</button></td>" +
       '<td class="col-actions"><button class="link-button link-button--danger" data-delete-item="' + li.id + '">delete</button></td>' +
       "</tr>";
-    if (!isOverridden && expandedLineItemId === li.id) {
+    if (expandedLineItemId === li.id) {
       rows += '<tr class="schedule-row"><td colspan="5">' + scheduleEditorHtml(li) + "</td></tr>";
     }
     return rows;
@@ -2163,221 +2121,6 @@
         var parts = btn.getAttribute("data-remove-payment").split("|");
         var li = findLineItem(parts[0]);
         li.payments = li.payments.filter(function (p) { return p.id !== parts[1]; });
-        render();
-        persist();
-      });
-    });
-  }
-
-  // ---------- Budget (contracts/expenses linked to cash flow line items) ----------
-  function allLineItemOptionsHtml(selectedId) {
-    var groups = project.categories.map(function (c) { return { id: c.id, name: c.name }; })
-      .concat([{ id: null, name: "Uncategorized" }])
-      .map(function (cat) { return { name: cat.name, items: project.lineItems.filter(function (li) { return li.categoryId === cat.id; }) }; })
-      .filter(function (g) { return g.items.length > 0; });
-    return groups.map(function (g) {
-      return '<optgroup label="' + esc(g.name) + '">' + g.items.map(function (li) {
-        return '<option value="' + li.id + '"' + (selectedId === li.id ? " selected" : "") + '>' + (li.code ? esc(li.code) + " " : "") + esc(li.description) + "</option>";
-      }).join("") + "</optgroup>";
-    }).join("");
-  }
-
-  function renderBudgetTab(el) {
-    var wrap = document.createElement("div");
-    wrap.className = "section";
-
-    var intro = document.createElement("p");
-    intro.className = "section__intro";
-    intro.textContent = "List the actual contracts/expenses under each cash flow line item. Once a line item has one or more budget lines linked to it, its amount and monthly schedule on the Cashflow tab become the sum of its linked budget lines.";
-    wrap.appendChild(intro);
-
-    var groups = project.budgetSections.map(function (s) { return { id: s.id, name: s.name }; })
-      .concat([{ id: null, name: "Ungrouped" }])
-      .map(function (sec) { return Object.assign({}, sec, { items: project.budgetItems.filter(function (bi) { return bi.sectionId === sec.id; }) }); })
-      .filter(function (g) { return g.id !== null || g.items.length > 0; });
-
-    groups.forEach(function (group) {
-      var groupEl = document.createElement("div");
-      groupEl.className = "category-group";
-      var total = sum(group.items.map(function (i) { return i.totalBudget; }));
-      var headerHtml = '<div class="category-group__header">';
-      if (group.id) {
-        headerHtml += '<input class="editable-text category-group__title" value="' + esc(group.name) + '" data-bsec-rename="' + group.id + '" />';
-      } else {
-        headerHtml += '<span class="category-group__title" style="color:var(--text-muted);font-weight:500;">' + esc(group.name) + "</span>";
-      }
-      headerHtml += '<span class="category-group__total">' + fmtMoney(total) + "</span>";
-      if (group.id) headerHtml += '<button class="link-button link-button--danger" data-bsec-delete="' + group.id + '">delete section</button>';
-      headerHtml += "</div>";
-
-      var tableHtml = '<table class="line-items-table"><thead><tr><th>Description</th><th>Linked cash flow line item</th><th class="col-money">Amount</th><th class="col-schedule">Schedule</th><th class="col-actions"></th></tr></thead><tbody>';
-      group.items.forEach(function (bi) { tableHtml += budgetItemRowHtml(bi); });
-      tableHtml += '<tr class="add-row"><td colspan="5"><button class="link-button" data-add-bitem="' + (group.id || "") + '">+ add budget line</button></td></tr></tbody></table>';
-
-      groupEl.innerHTML = headerHtml + tableHtml;
-      wrap.appendChild(groupEl);
-    });
-
-    var addSecBtn = document.createElement("button");
-    addSecBtn.className = "secondary-button";
-    addSecBtn.textContent = "+ add section";
-    addSecBtn.addEventListener("click", function () {
-      var name = prompt("Section name?");
-      if (name) {
-        project.budgetSections.push({ id: genId("bsec"), name: name, sortOrder: project.budgetSections.length });
-        render();
-        persist();
-      }
-    });
-    wrap.appendChild(addSecBtn);
-
-    el.appendChild(wrap);
-    wireBudgetEvents(el);
-  }
-
-  function budgetItemRowHtml(bi) {
-    var schedule = getLineItemSchedule(bi);
-    var summary = bi.scheduleMode === "EVEN"
-      ? (bi.startDate && bi.endDate ? "Even, " + bi.startDate + " → " + bi.endDate : "Even (set dates)")
-      : schedule.length + " custom payment" + (schedule.length === 1 ? "" : "s");
-    var linkedLi = bi.linkedLineItemId ? findLineItem(bi.linkedLineItemId) : null;
-    var rows = '<tr data-bitem-row="' + bi.id + '">' +
-      '<td><input class="editable-text" value="' + esc(bi.description) + '" data-bitem-field="description" data-bitem-id="' + bi.id + '" /></td>' +
-      '<td><select class="category-select" data-bitem-field="linkedLineItemId" data-bitem-id="' + bi.id + '">' +
-        '<option value="">— not linked —</option>' + allLineItemOptionsHtml(bi.linkedLineItemId) +
-      "</select>" + (bi.linkedLineItemId && !linkedLi ? ' <span class="schedule-editor__variance">(linked line item no longer exists)</span>' : "") + "</td>" +
-      '<td class="col-money"><input type="number" class="editable-number" value="' + bi.totalBudget + '" data-bitem-field="totalBudget" data-bitem-id="' + bi.id + '" /></td>' +
-      '<td class="col-schedule"><button class="link-button" data-toggle-bschedule="' + bi.id + '">' + (expandedBudgetItemId === bi.id ? "▾ " : "▸ ") + esc(summary) + "</button></td>" +
-      '<td class="col-actions"><button class="link-button link-button--danger" data-delete-bitem="' + bi.id + '">delete</button></td>' +
-      "</tr>";
-    if (expandedBudgetItemId === bi.id) {
-      rows += '<tr class="schedule-row"><td colspan="5">' + budgetScheduleEditorHtml(bi) + "</td></tr>";
-    }
-    return rows;
-  }
-
-  function budgetScheduleEditorHtml(bi) {
-    var isEven = bi.scheduleMode === "EVEN";
-    var html = '<div class="schedule-editor">' +
-      '<div class="schedule-editor__mode">' +
-        '<label><input type="radio" name="bmode-' + bi.id + '"' + (isEven ? " checked" : "") + ' data-bmode-radio="' + bi.id + '" value="EVEN" /> Spread evenly between dates</label>' +
-        '<label><input type="radio" name="bmode-' + bi.id + '"' + (!isEven ? " checked" : "") + ' data-bmode-radio="' + bi.id + '" value="CUSTOM" /> Specific payment dates</label>' +
-      "</div>";
-    if (isEven) {
-      var schedule = getLineItemSchedule(bi);
-      html += '<div class="schedule-editor__even">' +
-        '<label>Start<input type="date" value="' + esc(bi.startDate || "") + '" data-beven-field="startDate" data-bitem-id="' + bi.id + '" /></label>' +
-        '<label>End<input type="date" value="' + esc(bi.endDate || "") + '" data-beven-field="endDate" data-bitem-id="' + bi.id + '" /></label>';
-      if (bi.startDate && bi.endDate) {
-        html += '<span class="schedule-editor__hint">' + schedule.length + " monthly payment" + (schedule.length === 1 ? "" : "s") + " of " + fmtMoney(bi.totalBudget / Math.max(schedule.length, 1)) + " each</span>";
-      }
-      html += "</div>";
-    } else {
-      var scheduleTotal = sum(bi.payments.map(function (p) { return p.amount; }));
-      var variance = scheduleTotal - bi.totalBudget;
-      html += '<div class="schedule-editor__custom"><table class="mini-table"><thead><tr><th>Date</th><th>Amount</th><th></th></tr></thead><tbody>';
-      bi.payments.slice().sort(function (a, b) { return a.date.localeCompare(b.date); }).forEach(function (p) {
-        html += "<tr><td>" + fmtDate(p.date) + "</td><td>" + fmtMoney(p.amount, true) + '</td><td><button class="link-button" data-remove-bpayment="' + bi.id + "|" + p.id + '">remove</button></td></tr>';
-      });
-      html += '<tr><td><input type="date" data-new-bpayment-date="' + bi.id + '" /></td><td><input type="number" placeholder="0.00" data-new-bpayment-amount="' + bi.id + '" /></td>' +
-        '<td><button class="link-button" data-add-bpayment="' + bi.id + '">add</button></td></tr></tbody></table>';
-      if (Math.abs(variance) > 0.01) {
-        html += '<div class="schedule-editor__variance">Payments total ' + fmtMoney(scheduleTotal, true) + ", amount is " + fmtMoney(bi.totalBudget, true) + " (" + (variance > 0 ? "+" : "") + fmtMoney(variance, true) + ")</div>";
-      }
-      html += "</div>";
-    }
-    html += "</div>";
-    return html;
-  }
-
-  function findBudgetItem(id) { return project.budgetItems.filter(function (bi) { return bi.id === id; })[0]; }
-
-  function wireBudgetEvents(root) {
-    root.querySelectorAll("[data-bitem-field]").forEach(function (input) {
-      input.addEventListener("change", function () {
-        var bi = findBudgetItem(input.getAttribute("data-bitem-id"));
-        var field = input.getAttribute("data-bitem-field");
-        if (field === "totalBudget") bi[field] = Number(input.value) || 0;
-        else if (field === "linkedLineItemId") bi[field] = input.value || null;
-        else bi[field] = input.value;
-        render();
-        persist();
-      });
-    });
-    root.querySelectorAll("[data-bsec-rename]").forEach(function (input) {
-      input.addEventListener("change", function () {
-        var sec = project.budgetSections.filter(function (s) { return s.id === input.getAttribute("data-bsec-rename"); })[0];
-        sec.name = input.value;
-        render();
-        persist();
-      });
-    });
-    root.querySelectorAll("[data-bsec-delete]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var id = btn.getAttribute("data-bsec-delete");
-        var hasItems = project.budgetItems.some(function (bi) { return bi.sectionId === id; });
-        if (hasItems) { alert("Move or delete budget lines out of this section first."); return; }
-        project.budgetSections = project.budgetSections.filter(function (s) { return s.id !== id; });
-        render();
-        persist();
-      });
-    });
-    root.querySelectorAll("[data-add-bitem]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var secId = btn.getAttribute("data-add-bitem") || null;
-        project.budgetItems.push({ id: genId("bi"), sectionId: secId, description: "New budget line", linkedLineItemId: null, totalBudget: 0, scheduleMode: "EVEN", startDate: null, endDate: null, sortOrder: project.budgetItems.length, payments: [] });
-        render();
-        persist();
-      });
-    });
-    root.querySelectorAll("[data-delete-bitem]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var id = btn.getAttribute("data-delete-bitem");
-        var bi = findBudgetItem(id);
-        if (confirm('Delete "' + bi.description + '"?')) {
-          project.budgetItems = project.budgetItems.filter(function (x) { return x.id !== id; });
-          render();
-          persist();
-        }
-      });
-    });
-    root.querySelectorAll("[data-toggle-bschedule]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var id = btn.getAttribute("data-toggle-bschedule");
-        expandedBudgetItemId = expandedBudgetItemId === id ? null : id;
-        render();
-      });
-    });
-    root.querySelectorAll("[data-bmode-radio]").forEach(function (radio) {
-      radio.addEventListener("change", function () {
-        findBudgetItem(radio.getAttribute("data-bmode-radio")).scheduleMode = radio.value;
-        render();
-        persist();
-      });
-    });
-    root.querySelectorAll("[data-beven-field]").forEach(function (input) {
-      input.addEventListener("change", function () {
-        findBudgetItem(input.getAttribute("data-bitem-id"))[input.getAttribute("data-beven-field")] = input.value;
-        render();
-        persist();
-      });
-    });
-    root.querySelectorAll("[data-add-bpayment]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var id = btn.getAttribute("data-add-bpayment");
-        var dateInput = root.querySelector('[data-new-bpayment-date="' + id + '"]');
-        var amountInput = root.querySelector('[data-new-bpayment-amount="' + id + '"]');
-        if (!dateInput.value || !amountInput.value) return;
-        findBudgetItem(id).payments.push({ id: genId("bpay"), date: dateInput.value, amount: Number(amountInput.value) });
-        render();
-        persist();
-      });
-    });
-    root.querySelectorAll("[data-remove-bpayment]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var parts = btn.getAttribute("data-remove-bpayment").split("|");
-        var bi = findBudgetItem(parts[0]);
-        bi.payments = bi.payments.filter(function (p) { return p.id !== parts[1]; });
         render();
         persist();
       });
