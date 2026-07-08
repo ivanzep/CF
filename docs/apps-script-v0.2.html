@@ -208,7 +208,8 @@
   .summary-grid__category td.summary-grid__label, .summary-grid__category td.summary-grid__budget { background: var(--page); }
   .summary-grid__subtotal td { font-weight: 600; border-top: 1px solid var(--border-strong); }
   .summary-grid__grandtotal td { font-weight: 700; border-top: 2px solid var(--border-strong); font-size: 13.5px; }
-  .summary-grid-controls { display: flex; justify-content: flex-end; margin-bottom: -8px; }
+  .summary-grid-controls { display: flex; justify-content: flex-end; gap: 16px; margin-bottom: -8px; }
+  .cashflow-table-section--full { width: 100vw; max-width: 100vw; box-sizing: border-box; margin-left: calc(-50vw + 50%); margin-right: calc(-50vw + 50%); padding: 0 24px; }
   .summary-grid__expand-toggle { background: none; border: none; cursor: pointer; padding: 0 6px 0 0; color: var(--text-muted); font-size: 10px; vertical-align: middle; }
   .summary-grid__expand-toggle:hover { color: var(--text-primary); }
   .summary-grid__budgetline td { color: var(--text-muted); font-size: 11.5px; font-weight: 400 !important; }
@@ -554,6 +555,7 @@
   var chartCollapsed = true;
   var projectHeaderCollapsed = true;
   var highlightCurrentMonth = true;
+  var cashflowFullWidth = false;
   var monthNotes = {};
   var summarySectionCollapsed = { drawsList: false, yearly: false, drawReport: false, capTable: false };
   var showDrawGenerator = false;
@@ -1714,13 +1716,14 @@
 
     if (include.cashflowTable) {
       var tableSection = document.createElement("div");
-      tableSection.className = "cashflow-table-section print-section-boundary print-fit-section";
+      tableSection.className = "cashflow-table-section print-section-boundary print-fit-section" + (!forcePrint && cashflowFullWidth ? " cashflow-table-section--full" : "");
       tableSection.setAttribute("data-fit-key", "cashflowTable");
 
       if (!forcePrint) {
         var controlsWrap = document.createElement("div");
         controlsWrap.className = "summary-grid-controls";
-        controlsWrap.innerHTML = '<button class="link-button" id="highlightMonthBtn">' + (highlightCurrentMonth ? "☑" : "☐") + " highlight current month</button>";
+        controlsWrap.innerHTML = '<button class="link-button" id="highlightMonthBtn">' + (highlightCurrentMonth ? "☑" : "☐") + " highlight current month</button>" +
+          '<button class="link-button" id="cfFullWidthBtn">' + (cashflowFullWidth ? "☑" : "☐") + " full width table</button>";
         tableSection.appendChild(controlsWrap);
       }
 
@@ -1765,11 +1768,22 @@
       summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (summary.grandTotal.monthly[m] ? fmtMoney(summary.grandTotal.monthly[m]) : "") + "</td>"; });
       html += "</tr></tbody></table>";
       gridWrap.innerHTML = html;
-      tableSection.appendChild(gridWrap);
 
+      // offsetWidth is always 0 for a subtree not yet attached to the document, so measure
+      // via a temporary off-screen attach (gridWrap isn't in the live DOM until the caller
+      // appends the wrap this function returns).
+      gridWrap.style.position = "absolute";
+      gridWrap.style.visibility = "hidden";
+      gridWrap.style.left = "-99999px";
+      document.body.appendChild(gridWrap);
       var labelCell = gridWrap.querySelector(".summary-grid__label");
       if (labelCell) gridWrap.style.setProperty("--budget-col-left", labelCell.offsetWidth + "px");
+      document.body.removeChild(gridWrap);
+      gridWrap.style.position = "";
+      gridWrap.style.visibility = "";
+      gridWrap.style.left = "";
 
+      tableSection.appendChild(gridWrap);
       wrap.appendChild(tableSection);
     }
 
@@ -1778,6 +1792,8 @@
       if (chartBtn) chartBtn.addEventListener("click", function () { chartCollapsed = !chartCollapsed; render(); });
       var highlightBtn = wrap.querySelector("#highlightMonthBtn");
       if (highlightBtn) highlightBtn.addEventListener("click", function () { highlightCurrentMonth = !highlightCurrentMonth; render(); });
+      var fullWidthBtn = wrap.querySelector("#cfFullWidthBtn");
+      if (fullWidthBtn) fullWidthBtn.addEventListener("click", function () { cashflowFullWidth = !cashflowFullWidth; render(); });
       wrap.querySelectorAll("[data-note-month]").forEach(function (input) {
         input.addEventListener("change", function () {
           monthNotes[input.getAttribute("data-note-month")] = input.value;
