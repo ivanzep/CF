@@ -720,6 +720,10 @@
   }
   function saveNow() {
     showToast("Saving…");
+    project.printSettings = printSettings;
+    project.printSections = printSections;
+    project.printFit = printFit;
+    project.monthNotes = monthNotes;
     callApi("saveProject", { project: project }).then(function () {
       isDirty = false;
       updateSaveIndicator();
@@ -736,10 +740,19 @@
     if (!p.cashflowCellColors) p.cashflowCellColors = [];
     if (!p.capTableSettings) p.capTableSettings = { prefPercent: 0, startDate: null, endDate: null };
     (p.capTable || []).forEach(function (m) { if (!m.capitalReturns) m.capitalReturns = []; });
+    if (!p.printSettings) p.printSettings = null;
+    if (!p.printSections) p.printSections = null;
+    if (!p.printFit) p.printFit = null;
+    if (!p.monthNotes) p.monthNotes = {};
     return p;
   }
   function applyLoadedProject(p) {
     project = normalizeProject(p);
+    if (project.printSettings) printSettings = Object.assign({}, printSettings, project.printSettings);
+    if (project.printSections) printSections = Object.assign({}, printSections, project.printSections);
+    if (project.printFit) printFit = Object.assign({}, printFit, project.printFit);
+    monthNotes = project.monthNotes || {};
+    monthNotesLoadedForId = project.id;
     isDirty = false;
     updateSaveIndicator();
     var isEmpty = project.categories.length === 0 && project.lineItems.length === 0 &&
@@ -782,7 +795,7 @@
     document.getElementById("startBlankBtn").addEventListener("click", function () { render(); });
     document.getElementById("loadExampleBtn").addEventListener("click", function () {
       el.innerHTML = '<p class="section__intro">Loading example data…</p>';
-      callApi("loadExampleData").then(function (p) { project = normalizeProject(p); render(); }).catch(function (err) {
+      callApi("loadExampleData").then(function (p) { applyLoadedProject(p); }).catch(function (err) {
         alert("Failed to load example data: " + err.message);
       });
     });
@@ -887,14 +900,8 @@
     return draws;
   }
 
-  // ---------- month notes (local only, per project) ----------
+  // ---------- month notes (persisted on project) ----------
   var monthNotesLoadedForId = null;
-  function loadMonthNotesFor(projectId) {
-    try { return JSON.parse(localStorage.getItem("cf-month-notes:" + projectId) || "{}"); } catch (e) { return {}; }
-  }
-  function saveMonthNotesFor(projectId, notes) {
-    localStorage.setItem("cf-month-notes:" + projectId, JSON.stringify(notes));
-  }
   function currentMonthKey() {
     var now = new Date();
     return now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-01";
@@ -1826,10 +1833,6 @@
     var wrap = document.createElement("div");
     wrap.className = "section";
 
-    if (monthNotesLoadedForId !== project.id) {
-      monthNotes = loadMonthNotesFor(project.id);
-      monthNotesLoadedForId = project.id;
-    }
     var thisMonth = currentMonthKey();
     function monthClass(m) { return highlightCurrentMonth && m === thisMonth ? " summary-grid__month--current" : ""; }
     var uniqueYears = Array.from(new Set(summary.months.map(yearOf)));
@@ -1963,7 +1966,7 @@
       wrap.querySelectorAll("[data-note-month]").forEach(function (input) {
         input.addEventListener("change", function () {
           monthNotes[input.getAttribute("data-note-month")] = input.value;
-          saveMonthNotesFor(project.id, monthNotes);
+          persist();
         });
       });
       wrap.querySelectorAll("[data-toggle-cf-expand]").forEach(function (btn) {
@@ -3393,12 +3396,32 @@
     document.getElementById("ppSettingsPanel").style.display = printSettingsPanelCollapsed ? "none" : "flex";
     document.getElementById("ppSettingsToggleBtn").textContent = (printSettingsPanelCollapsed ? "▸" : "▾") + " Settings";
   }
+  function syncPrintPanelFromState() {
+    document.getElementById("ppPageSize").value = printSettings.pageSize;
+    document.getElementById("ppOrientation").value = printSettings.orientation;
+    document.getElementById("ppMarginTop").value = printSettings.marginTopIn;
+    document.getElementById("ppMarginRight").value = printSettings.marginRightIn;
+    document.getElementById("ppMarginBottom").value = printSettings.marginBottomIn;
+    document.getElementById("ppMarginLeft").value = printSettings.marginLeftIn;
+    document.getElementById("ppFontScale").value = printSettings.fontScalePercent;
+    document.getElementById("ppRowSize").value = printSettings.rowSize;
+    document.getElementById("ppColorMode").value = printSettings.colorMode;
+    document.getElementById("ppRepeatHeader").checked = printSettings.repeatHeader;
+    document.getElementById("ppPageBreakSections").checked = printSettings.pageBreakPerSection;
+    document.getElementById("ppLogoUrl").value = printSettings.logoUrl;
+    [["psCashflowGraph", "cashflowGraph"], ["psCashflowTable", "cashflowTable"], ["psYearly", "yearly"], ["psDrawReport", "drawReport"], ["psCapTable", "capTable"], ["psDrawsList", "drawsList"]].forEach(function (pair) {
+      document.getElementById(pair[0]).checked = !!printSections[pair[1]];
+    });
+    [["pfCashflowGraph", "cashflowGraph"], ["pfCashflowTable", "cashflowTable"], ["pfYearly", "yearly"], ["pfDrawReport", "drawReport"], ["pfCapTable", "capTable"], ["pfDrawsList", "drawsList"]].forEach(function (pair) {
+      document.getElementById(pair[0]).value = printFit[pair[1]];
+    });
+  }
   function setPreviewMode(on) {
     previewMode = on;
     if (on) printGeneratedAt = new Date();
     document.body.classList.toggle("print-preview-mode", on);
     document.getElementById("printPreviewBar").style.display = on ? "flex" : "none";
-    if (on) { applyPrintSettingsToDom(); updateSettingsPanelToggle(); }
+    if (on) { syncPrintPanelFromState(); applyPrintSettingsToDom(); updateSettingsPanelToggle(); }
     render();
   }
   document.getElementById("printBtn").addEventListener("click", function () {
@@ -3416,72 +3439,86 @@
   });
   document.getElementById("ppPageSize").addEventListener("change", function (e) {
     printSettings.pageSize = e.target.value;
+    persist();
     applyPrintSettingsToDom();
     render();
   });
   document.getElementById("ppOrientation").addEventListener("change", function (e) {
     printSettings.orientation = e.target.value;
+    persist();
     applyPrintSettingsToDom();
     render();
   });
   document.getElementById("ppMarginTop").addEventListener("change", function (e) {
     printSettings.marginTopIn = Number(e.target.value) || 0;
+    persist();
     applyPrintSettingsToDom();
     render();
   });
   document.getElementById("ppMarginRight").addEventListener("change", function (e) {
     printSettings.marginRightIn = Number(e.target.value) || 0;
+    persist();
     applyPrintSettingsToDom();
     render();
   });
   document.getElementById("ppMarginBottom").addEventListener("change", function (e) {
     printSettings.marginBottomIn = Number(e.target.value) || 0;
+    persist();
     applyPrintSettingsToDom();
     render();
   });
   document.getElementById("ppMarginLeft").addEventListener("change", function (e) {
     printSettings.marginLeftIn = Number(e.target.value) || 0;
+    persist();
     applyPrintSettingsToDom();
     render();
   });
   document.getElementById("ppRepeatHeader").addEventListener("change", function (e) {
     printSettings.repeatHeader = e.target.checked;
+    persist();
     render();
   });
   document.getElementById("ppPageBreakSections").addEventListener("change", function (e) {
     printSettings.pageBreakPerSection = e.target.checked;
+    persist();
     applyPrintSettingsToDom();
     render();
   });
   document.getElementById("ppLogoUrl").addEventListener("change", function (e) {
     printSettings.logoUrl = e.target.value.trim();
+    persist();
     applyPrintSettingsToDom();
     render();
   });
   [["psCashflowGraph", "cashflowGraph"], ["psCashflowTable", "cashflowTable"], ["psYearly", "yearly"], ["psDrawReport", "drawReport"], ["psCapTable", "capTable"], ["psDrawsList", "drawsList"]].forEach(function (pair) {
     document.getElementById(pair[0]).addEventListener("change", function (e) {
       printSections[pair[1]] = e.target.checked;
+      persist();
       render();
     });
   });
   [["pfCashflowGraph", "cashflowGraph"], ["pfCashflowTable", "cashflowTable"], ["pfYearly", "yearly"], ["pfDrawReport", "drawReport"], ["pfCapTable", "capTable"], ["pfDrawsList", "drawsList"]].forEach(function (pair) {
     document.getElementById(pair[0]).addEventListener("change", function (e) {
       printFit[pair[1]] = e.target.value;
+      persist();
       render();
     });
   });
   document.getElementById("ppFontScale").addEventListener("change", function (e) {
     printSettings.fontScalePercent = Math.max(50, Math.min(200, Number(e.target.value) || 100));
+    persist();
     applyPrintSettingsToDom();
     render();
   });
   document.getElementById("ppRowSize").addEventListener("change", function (e) {
     printSettings.rowSize = e.target.value;
+    persist();
     applyPrintSettingsToDom();
     render();
   });
   document.getElementById("ppColorMode").addEventListener("change", function (e) {
     printSettings.colorMode = e.target.value;
+    persist();
     applyPrintSettingsToDom();
     render();
   });

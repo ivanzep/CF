@@ -34,7 +34,7 @@
  */
 
 var TAB_SCHEMA = {
-  Project: ["id", "name", "client", "address", "description", "projectDate", "capTablePrefPercent", "capTableStartDate", "capTableEndDate"],
+  Project: ["id", "name", "client", "address", "description", "projectDate", "capTablePrefPercent", "capTableStartDate", "capTableEndDate", "printSettingsJson", "printSectionsJson", "printFitJson", "monthNotesJson"],
   Categories: ["id", "name", "sortOrder"],
   LineItems: ["id", "categoryId", "code", "description", "totalBudget", "scheduleMode", "startDate", "endDate", "sortOrder", "color"],
   Payments: ["id", "lineItemId", "date", "amount"],
@@ -205,6 +205,11 @@ function num_(v) {
 function numOrNull_(v) {
   return v === "" || v == null ? null : Number(v);
 }
+function jsonOrNull_(v) {
+  var s = str_(v);
+  if (!s) return null;
+  try { return JSON.parse(s); } catch (e) { return null; }
+}
 
 /** Reads every tab and assembles the nested Project object the client expects. */
 function getProject() {
@@ -293,6 +298,10 @@ function getProject() {
       startDate: strOrNull_(projectRow[7]),
       endDate: strOrNull_(projectRow[8]),
     },
+    printSettings: jsonOrNull_(projectRow[9]),
+    printSections: jsonOrNull_(projectRow[10]),
+    printFit: jsonOrNull_(projectRow[11]),
+    monthNotes: jsonOrNull_(projectRow[12]) || {},
     categories: readTab_("Categories").map(function (row) {
       return { id: str_(row[0]), name: str_(row[1]), sortOrder: num_(row[2]) };
     }),
@@ -317,7 +326,8 @@ function saveProject(project) {
 
   var capSettings = project.capTableSettings || {};
   writeTab_("Project", [[project.id, project.name || "", project.client || "", project.address || "", project.description || "", project.projectDate || "",
-    capSettings.prefPercent || 0, capSettings.startDate || "", capSettings.endDate || ""]]);
+    capSettings.prefPercent || 0, capSettings.startDate || "", capSettings.endDate || "",
+    JSON.stringify(project.printSettings || {}), JSON.stringify(project.printSections || {}), JSON.stringify(project.printFit || {}), JSON.stringify(project.monthNotes || {})]]);
   writeTab_("Categories", project.categories.map(function (c) { return [c.id, c.name, c.sortOrder]; }));
   writeTab_("LineItems", project.lineItems.map(function (li) {
     return [li.id, li.categoryId || "", li.code || "", li.description, li.totalBudget, li.scheduleMode, li.startDate || "", li.endDate || "", li.sortOrder, li.color || ""];
