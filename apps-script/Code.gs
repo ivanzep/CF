@@ -36,7 +36,7 @@
 var TAB_SCHEMA = {
   Project: ["id", "name", "client", "address", "description", "projectDate"],
   Categories: ["id", "name", "sortOrder"],
-  LineItems: ["id", "categoryId", "code", "description", "totalBudget", "scheduleMode", "startDate", "endDate", "sortOrder"],
+  LineItems: ["id", "categoryId", "code", "description", "totalBudget", "scheduleMode", "startDate", "endDate", "sortOrder", "color"],
   Payments: ["id", "lineItemId", "date", "amount"],
   Draws: ["id", "name", "date", "amount", "source", "sortOrder"],
   CapTable: ["id", "name", "role", "ownershipPercent", "sortOrder"],
@@ -45,6 +45,7 @@ var TAB_SCHEMA = {
   BudgetSections: ["id", "name", "sortOrder"],
   BudgetItems: ["id", "sectionId", "description", "linkedLineItemId", "totalBudget", "scheduleMode", "startDate", "endDate", "sortOrder"],
   BudgetPayments: ["id", "budgetItemId", "date", "amount"],
+  CellColors: ["lineItemId", "month", "color"],
 };
 
 // 1-indexed column numbers that hold dates, per tab. Formatted as plain
@@ -58,6 +59,7 @@ var DATE_COLUMNS = {
   Distributions: [3],
   BudgetItems: [7, 8],
   BudgetPayments: [3],
+  CellColors: [2],
 };
 
 function doGet(e) {
@@ -218,6 +220,7 @@ function getProject() {
       startDate: strOrNull_(row[6]),
       endDate: strOrNull_(row[7]),
       sortOrder: num_(row[8]),
+      color: strOrNull_(row[9]),
       payments: [],
     };
   });
@@ -290,6 +293,9 @@ function getProject() {
       return { id: str_(row[0]), name: str_(row[1]), sortOrder: num_(row[2]) };
     }),
     budgetItems: budgetItems,
+    cashflowCellColors: readTab_("CellColors").map(function (row) {
+      return { lineItemId: str_(row[0]), month: str_(row[1]), color: str_(row[2]) };
+    }),
   };
 }
 
@@ -300,7 +306,7 @@ function saveProject(project) {
   writeTab_("Project", [[project.id, project.name || "", project.client || "", project.address || "", project.description || "", project.projectDate || ""]]);
   writeTab_("Categories", project.categories.map(function (c) { return [c.id, c.name, c.sortOrder]; }));
   writeTab_("LineItems", project.lineItems.map(function (li) {
-    return [li.id, li.categoryId || "", li.code || "", li.description, li.totalBudget, li.scheduleMode, li.startDate || "", li.endDate || "", li.sortOrder];
+    return [li.id, li.categoryId || "", li.code || "", li.description, li.totalBudget, li.scheduleMode, li.startDate || "", li.endDate || "", li.sortOrder, li.color || ""];
   }));
   writeTab_("Payments", project.lineItems.reduce(function (acc, li) {
     return acc.concat(li.payments.map(function (p) { return [p.id, li.id, p.date, p.amount]; }));
@@ -320,6 +326,7 @@ function saveProject(project) {
   writeTab_("BudgetPayments", (project.budgetItems || []).reduce(function (acc, bi) {
     return acc.concat(bi.payments.map(function (p) { return [p.id, bi.id, p.date, p.amount]; }));
   }, []));
+  writeTab_("CellColors", (project.cashflowCellColors || []).map(function (c) { return [c.lineItemId, c.month, c.color]; }));
 
   return true;
 }
@@ -368,10 +375,11 @@ function loadExampleData() {
   project.lineItems = lineItems;
   project.draws = draws;
   project.capTable = capTable;
-  // Line items get fresh ids above, so any existing budget items' links would
-  // point at ids that no longer exist — reset budget data along with everything else.
+  // Line items get fresh ids above, so any existing budget items/cell colors that
+  // reference the old ids would be orphaned — reset along with everything else.
   project.budgetSections = [];
   project.budgetItems = [];
+  project.cashflowCellColors = [];
 
   saveProject(project);
   return project;

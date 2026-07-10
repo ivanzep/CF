@@ -209,11 +209,18 @@
   .summary-grid__code { color: var(--text-muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
   .summary-grid__monthnum { display: block; font-size: 9.5px; font-weight: 400; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; }
   .summary-grid__monthlabel { display: block; }
-  .summary-grid__category td { font-weight: 600; background: var(--page); }
+  .summary-grid__category td { font-weight: 600; background: var(--page); border-top: 2px solid var(--border-strong); padding-top: calc(5px + var(--section-gap, 0px)); }
   .summary-grid__category td.summary-grid__label, .summary-grid__category td.summary-grid__budget { background: var(--page); }
   .summary-grid__subtotal td { font-weight: 600; border-top: 1px solid var(--border-strong); }
   .summary-grid__grandtotal td { font-weight: 700; border-top: 2px solid var(--border-strong); font-size: 13.5px; }
-  .summary-grid-controls { display: flex; justify-content: flex-end; gap: 16px; margin-bottom: 10px; position: relative; z-index: 4; }
+  .summary-grid-controls { display: flex; align-items: center; justify-content: flex-end; gap: 16px; margin-bottom: 10px; position: relative; z-index: 4; }
+  .summary-grid-controls__gap { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+  .summary-grid-controls__gap input { width: 48px; }
+  .summary-grid td.summary-grid__colored, .summary-grid th.summary-grid__colored { background: var(--cell-bg) !important; }
+  .summary-grid tr[data-item-row-cf] td:not(.summary-grid__colored) { cursor: context-menu; }
+  .cf-color-menu { position: fixed; z-index: 200; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .cf-color-menu label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); }
+  .cf-color-menu input[type="color"] { width: 32px; height: 24px; padding: 0; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
   .cashflow-table-section--full { width: 100vw; max-width: 100vw; box-sizing: border-box; margin-left: calc(-50vw + 50%); margin-right: calc(-50vw + 50%); padding: 0 24px; }
   .summary-grid__expand-toggle { background: none; border: none; cursor: pointer; padding: 0 6px 0 0; color: var(--text-muted); font-size: 10px; vertical-align: middle; }
   .summary-grid__expand-toggle:hover { color: var(--text-primary); }
@@ -561,6 +568,8 @@
   var projectHeaderCollapsed = true;
   var highlightCurrentMonth = true;
   var cashflowFullWidth = false;
+  var cashflowSectionGapPx = 0;
+  var cfColorMenuState = null;
   var monthNotes = {};
   var summarySectionCollapsed = { drawsList: false, yearly: false, drawReport: false, capTable: false };
   var showDrawGenerator = false;
@@ -718,6 +727,7 @@
   function normalizeProject(p) {
     if (!p.budgetSections) p.budgetSections = [];
     if (!p.budgetItems) p.budgetItems = [];
+    if (!p.cashflowCellColors) p.cashflowCellColors = [];
     return p;
   }
   function applyLoadedProject(p) {
@@ -1477,6 +1487,7 @@
       var lineItems = items.map(function (x) {
         return { id: x.li.id, code: x.li.code, description: x.li.description, totalBudget: x.effectiveBudget,
           scheduleMode: x.li.scheduleMode, monthly: monthlyMapFor(x.schedule), linkedBudgetCount: x.linkedCount,
+          color: x.li.color,
           linkedBudgetItems: x.linkedItems.map(function (bi) {
             return { id: bi.id, description: bi.description, totalBudget: bi.totalBudget, monthly: monthlyMapFor(getLineItemSchedule(bi)) };
           }) };
@@ -1688,6 +1699,58 @@
   }
 
   // ---------- Cashflow (chart + monthly grid) ----------
+  function getCellColor(lineItemId, month) {
+    var entry = project.cashflowCellColors.filter(function (c) { return c.lineItemId === lineItemId && c.month === month; })[0];
+    return entry ? entry.color : null;
+  }
+  function setCellColor(lineItemId, month, color) {
+    project.cashflowCellColors = project.cashflowCellColors.filter(function (c) { return !(c.lineItemId === lineItemId && c.month === month); });
+    if (color) project.cashflowCellColors.push({ lineItemId: lineItemId, month: month, color: color });
+  }
+  function coloredTdAttrs(baseClass, color) {
+    if (!color) return 'class="' + baseClass + '"';
+    return 'class="' + baseClass + ' summary-grid__colored" style="--cell-bg:' + esc(color) + ';"';
+  }
+
+  function closeCfColorMenu() {
+    var el = document.getElementById("cfColorMenu");
+    if (el) el.remove();
+    cfColorMenuState = null;
+    document.removeEventListener("click", closeCfColorMenuOnOutsideClick, true);
+  }
+  function closeCfColorMenuOnOutsideClick(e) {
+    var menu = document.getElementById("cfColorMenu");
+    if (menu && !menu.contains(e.target)) closeCfColorMenu();
+  }
+  function applyCfColorChoice(color) {
+    if (!cfColorMenuState) return;
+    if (cfColorMenuState.type === "row") {
+      var li = findLineItem(cfColorMenuState.lineItemId);
+      if (li) li.color = color;
+    } else {
+      setCellColor(cfColorMenuState.lineItemId, cfColorMenuState.month, color);
+    }
+    persist();
+    closeCfColorMenu();
+    render();
+  }
+  function openCfColorMenu(x, y, type, lineItemId, month, currentColor) {
+    closeCfColorMenu();
+    cfColorMenuState = { type: type, lineItemId: lineItemId, month: month };
+    var menu = document.createElement("div");
+    menu.id = "cfColorMenu";
+    menu.className = "cf-color-menu";
+    menu.style.left = Math.min(x, window.innerWidth - 200) + "px";
+    menu.style.top = Math.min(y, window.innerHeight - 80) + "px";
+    menu.innerHTML =
+      '<label>Color<input type="color" id="cfColorInput" value="' + (currentColor || "#ffe08a") + '" /></label>' +
+      '<button type="button" class="link-button" id="cfColorClearBtn">Clear color</button>';
+    document.body.appendChild(menu);
+    document.getElementById("cfColorInput").addEventListener("input", function (e) { applyCfColorChoice(e.target.value); });
+    document.getElementById("cfColorClearBtn").addEventListener("click", function () { applyCfColorChoice(null); });
+    setTimeout(function () { document.addEventListener("click", closeCfColorMenuOnOutsideClick, true); }, 0);
+  }
+
   function buildCashflowSection(summary, forcePrint, sectionsFilter) {
     var include = sectionsFilter || { cashflowGraph: true, cashflowTable: true };
     var wrap = document.createElement("div");
@@ -1728,7 +1791,9 @@
         var controlsWrap = document.createElement("div");
         controlsWrap.className = "summary-grid-controls";
         controlsWrap.innerHTML = '<button class="link-button" id="highlightMonthBtn">' + (highlightCurrentMonth ? "☑" : "☐") + " highlight current month</button>" +
-          '<button class="link-button" id="cfFullWidthBtn">' + (cashflowFullWidth ? "☑" : "☐") + " full width table</button>";
+          '<button class="link-button" id="cfFullWidthBtn">' + (cashflowFullWidth ? "☑" : "☐") + " full width table</button>" +
+          '<label class="summary-grid-controls__gap">Section spacing<input type="number" id="cfSectionGap" min="0" max="40" value="' + cashflowSectionGapPx + '" />px</label>' +
+          '<span class="summary-grid-controls__gap" style="color:var(--text-muted);">right-click a row or cell to color it</span>';
         tableSection.appendChild(controlsWrap);
       }
 
@@ -1752,9 +1817,15 @@
           var toggle = (!forcePrint && hasLinked)
             ? '<button class="link-button summary-grid__expand-toggle" data-toggle-cf-expand="' + li.id + '">' + (isExpanded ? "▾" : "▸") + "</button>"
             : "";
-          html += '<tr><td class="summary-grid__label">' + toggle + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
-          html += '<td class="col-money summary-grid__budget">' + fmtMoney(li.totalBudget) + "</td>";
-          summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (li.monthly[m] ? fmtMoney(li.monthly[m]) : "") + "</td>"; });
+          var rowColorAttr = !forcePrint ? ' data-color-row="' + li.id + '"' : "";
+          html += "<tr>";
+          html += "<td " + coloredTdAttrs("summary-grid__label", li.color) + rowColorAttr + ">" + toggle + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
+          html += "<td " + coloredTdAttrs("col-money summary-grid__budget", li.color) + rowColorAttr + ">" + fmtMoney(li.totalBudget) + "</td>";
+          summary.months.forEach(function (m) {
+            var cellColor = getCellColor(li.id, m) || li.color;
+            var cellAttr = !forcePrint ? ' data-color-cell="' + li.id + "|" + m + '"' : "";
+            html += "<td " + coloredTdAttrs("col-money" + colClass(m), cellColor) + cellAttr + ">" + (li.monthly[m] ? fmtMoney(li.monthly[m]) : "") + "</td>";
+          });
           html += "</tr>";
           if (!forcePrint && isExpanded) {
             li.linkedBudgetItems.forEach(function (bi) {
@@ -1787,6 +1858,7 @@
       gridWrap.style.position = "";
       gridWrap.style.visibility = "";
       gridWrap.style.left = "";
+      gridWrap.style.setProperty("--section-gap", cashflowSectionGapPx + "px");
 
       tableSection.appendChild(gridWrap);
       wrap.appendChild(tableSection);
@@ -1799,6 +1871,25 @@
       if (highlightBtn) highlightBtn.addEventListener("click", function () { highlightCurrentMonth = !highlightCurrentMonth; render(); });
       var fullWidthBtn = wrap.querySelector("#cfFullWidthBtn");
       if (fullWidthBtn) fullWidthBtn.addEventListener("click", function () { cashflowFullWidth = !cashflowFullWidth; render(); });
+      var gapInput = wrap.querySelector("#cfSectionGap");
+      if (gapInput) gapInput.addEventListener("change", function () {
+        cashflowSectionGapPx = Math.max(0, Math.min(40, Number(gapInput.value) || 0));
+        render();
+      });
+      wrap.querySelectorAll("[data-color-row]").forEach(function (td) {
+        td.addEventListener("contextmenu", function (e) {
+          e.preventDefault();
+          var li = findLineItem(td.getAttribute("data-color-row"));
+          openCfColorMenu(e.clientX, e.clientY, "row", td.getAttribute("data-color-row"), null, li ? li.color : null);
+        });
+      });
+      wrap.querySelectorAll("[data-color-cell]").forEach(function (td) {
+        td.addEventListener("contextmenu", function (e) {
+          e.preventDefault();
+          var parts = td.getAttribute("data-color-cell").split("|");
+          openCfColorMenu(e.clientX, e.clientY, "cell", parts[0], parts[1], getCellColor(parts[0], parts[1]));
+        });
+      });
       wrap.querySelectorAll("[data-note-month]").forEach(function (input) {
         input.addEventListener("change", function () {
           monthNotes[input.getAttribute("data-note-month")] = input.value;
@@ -2162,7 +2253,7 @@
     root.querySelectorAll("[data-add-item]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var catId = btn.getAttribute("data-add-item") || null;
-        project.lineItems.push({ id: genId("li"), categoryId: catId, code: "", description: "New line item", totalBudget: 0, scheduleMode: "EVEN", startDate: null, endDate: null, sortOrder: project.lineItems.length, payments: [] });
+        project.lineItems.push({ id: genId("li"), categoryId: catId, code: "", description: "New line item", totalBudget: 0, scheduleMode: "EVEN", startDate: null, endDate: null, sortOrder: project.lineItems.length, payments: [], color: null });
         render();
         persist();
       });
