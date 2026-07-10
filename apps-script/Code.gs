@@ -34,7 +34,7 @@
  */
 
 var TAB_SCHEMA = {
-  Project: ["id", "name", "client", "address", "description", "projectDate"],
+  Project: ["id", "name", "client", "address", "description", "projectDate", "capTablePrefPercent", "capTableStartDate", "capTableEndDate"],
   Categories: ["id", "name", "sortOrder"],
   LineItems: ["id", "categoryId", "code", "description", "totalBudget", "scheduleMode", "startDate", "endDate", "sortOrder", "color"],
   Payments: ["id", "lineItemId", "date", "amount"],
@@ -42,6 +42,7 @@ var TAB_SCHEMA = {
   CapTable: ["id", "name", "role", "ownershipPercent", "sortOrder"],
   Contributions: ["id", "memberId", "date", "amount", "note"],
   Distributions: ["id", "memberId", "date", "amount", "note"],
+  CapitalReturns: ["id", "memberId", "date", "amount", "note"],
   BudgetSections: ["id", "name", "sortOrder"],
   BudgetItems: ["id", "sectionId", "description", "linkedLineItemId", "totalBudget", "scheduleMode", "startDate", "endDate", "sortOrder"],
   BudgetPayments: ["id", "budgetItemId", "date", "amount"],
@@ -51,12 +52,13 @@ var TAB_SCHEMA = {
 // 1-indexed column numbers that hold dates, per tab. Formatted as plain
 // text so Sheets never silently reinterprets "2026-01-01" as a date serial.
 var DATE_COLUMNS = {
-  Project: [6],
+  Project: [6, 8, 9],
   LineItems: [7, 8],
   Payments: [3],
   Draws: [3],
   Contributions: [3],
   Distributions: [3],
+  CapitalReturns: [3],
   BudgetItems: [7, 8],
   BudgetPayments: [3],
   CellColors: [2],
@@ -240,6 +242,7 @@ function getProject() {
       sortOrder: num_(row[4]),
       contributions: [],
       distributions: [],
+      capitalReturns: [],
     };
   });
   var membersById = {};
@@ -251,6 +254,10 @@ function getProject() {
   readTab_("Distributions").forEach(function (row) {
     var m = membersById[str_(row[1])];
     if (m) m.distributions.push({ id: str_(row[0]), date: str_(row[2]), amount: num_(row[3]), note: strOrNull_(row[4]) });
+  });
+  readTab_("CapitalReturns").forEach(function (row) {
+    var m = membersById[str_(row[1])];
+    if (m) m.capitalReturns.push({ id: str_(row[0]), date: str_(row[2]), amount: num_(row[3]), note: strOrNull_(row[4]) });
   });
 
   var budgetItems = readTab_("BudgetItems").map(function (row) {
@@ -281,6 +288,11 @@ function getProject() {
     address: strOrNull_(projectRow[3]),
     description: strOrNull_(projectRow[4]),
     projectDate: str_(projectRow[5]) || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"),
+    capTableSettings: {
+      prefPercent: num_(projectRow[6]),
+      startDate: strOrNull_(projectRow[7]),
+      endDate: strOrNull_(projectRow[8]),
+    },
     categories: readTab_("Categories").map(function (row) {
       return { id: str_(row[0]), name: str_(row[1]), sortOrder: num_(row[2]) };
     }),
@@ -303,7 +315,9 @@ function getProject() {
 function saveProject(project) {
   ensureSheetsExist_();
 
-  writeTab_("Project", [[project.id, project.name || "", project.client || "", project.address || "", project.description || "", project.projectDate || ""]]);
+  var capSettings = project.capTableSettings || {};
+  writeTab_("Project", [[project.id, project.name || "", project.client || "", project.address || "", project.description || "", project.projectDate || "",
+    capSettings.prefPercent || 0, capSettings.startDate || "", capSettings.endDate || ""]]);
   writeTab_("Categories", project.categories.map(function (c) { return [c.id, c.name, c.sortOrder]; }));
   writeTab_("LineItems", project.lineItems.map(function (li) {
     return [li.id, li.categoryId || "", li.code || "", li.description, li.totalBudget, li.scheduleMode, li.startDate || "", li.endDate || "", li.sortOrder, li.color || ""];
@@ -318,6 +332,9 @@ function saveProject(project) {
   }, []));
   writeTab_("Distributions", project.capTable.reduce(function (acc, m) {
     return acc.concat(m.distributions.map(function (d) { return [d.id, m.id, d.date, d.amount, d.note || ""]; }));
+  }, []));
+  writeTab_("CapitalReturns", project.capTable.reduce(function (acc, m) {
+    return acc.concat((m.capitalReturns || []).map(function (r) { return [r.id, m.id, r.date, r.amount, r.note || ""]; }));
   }, []));
   writeTab_("BudgetSections", (project.budgetSections || []).map(function (s) { return [s.id, s.name, s.sortOrder]; }));
   writeTab_("BudgetItems", (project.budgetItems || []).map(function (bi) {
@@ -366,6 +383,7 @@ function loadExampleData() {
       sortOrder: i,
       contributions: m.contributions.map(function (c) { return { id: genId_("contrib"), date: c.date, amount: c.amount, note: c.note }; }),
       distributions: m.distributions.map(function (d) { return { id: genId_("dist"), date: d.date, amount: d.amount, note: d.note }; }),
+      capitalReturns: [],
     };
   });
 

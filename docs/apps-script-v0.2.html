@@ -734,6 +734,8 @@
     if (!p.budgetSections) p.budgetSections = [];
     if (!p.budgetItems) p.budgetItems = [];
     if (!p.cashflowCellColors) p.cashflowCellColors = [];
+    if (!p.capTableSettings) p.capTableSettings = { prefPercent: 0, startDate: null, endDate: null };
+    (p.capTable || []).forEach(function (m) { if (!m.capitalReturns) m.capitalReturns = []; });
     return p;
   }
   function applyLoadedProject(p) {
@@ -1448,6 +1450,67 @@
     });
   }
 
+  function monthRangeInclusive(startIso, endIso) {
+    var s = startIso.slice(0, 7).split("-").map(Number), e = endIso.slice(0, 7).split("-").map(Number);
+    var startKey = s[0] * 12 + (s[1] - 1), endKey = e[0] * 12 + (e[1] - 1);
+    var months = [];
+    for (var k = startKey; k <= endKey; k++) {
+      var y = Math.floor(k / 12), mo = k % 12;
+      months.push(y + "-" + String(mo + 1).padStart(2, "0") + "-01");
+    }
+    return months;
+  }
+
+  // Simple (non-compounding) preferred return: each month's accrual is the annual pref
+  // rate applied to the capital balance carried in from the end of the prior month, so a
+  // contribution made mid-month doesn't itself earn pref until the following month.
+  // Capital returns reduce the balance pref accrues on going forward; they don't touch
+  // already-accrued unpaid pref, which is tracked separately and only settled at exit.
+  function computeCapTableDetail(proj) {
+    var settings = proj.capTableSettings || {};
+    if (!settings.startDate || !settings.endDate) return { months: [], members: [], totals: null };
+    var months = monthRangeInclusive(settings.startDate, settings.endDate);
+    var monthlyRate = (Number(settings.prefPercent) || 0) / 100 / 12;
+
+    var members = (proj.capTable || []).map(function (m) {
+      var capitalByMonth = {}, prefByMonth = {}, totalByMonth = {};
+      var balance = 0, cumPref = 0;
+      months.forEach(function (mo) {
+        var moKey = mo.slice(0, 7);
+        var accrual = round2(balance * monthlyRate);
+        cumPref = round2(cumPref + accrual);
+        var contribThisMonth = sum(m.contributions.filter(function (c) { return c.date.slice(0, 7) === moKey; }).map(function (c) { return c.amount; }));
+        var returnThisMonth = sum((m.capitalReturns || []).filter(function (r) { return r.date.slice(0, 7) === moKey; }).map(function (r) { return r.amount; }));
+        balance = round2(balance + contribThisMonth - returnThisMonth);
+        capitalByMonth[mo] = balance;
+        prefByMonth[mo] = accrual;
+        totalByMonth[mo] = round2(balance + cumPref);
+      });
+      return {
+        id: m.id, name: m.name, role: m.role,
+        capitalByMonth: capitalByMonth, prefByMonth: prefByMonth, totalByMonth: totalByMonth,
+        finalCapital: balance, finalCumPref: cumPref,
+      };
+    });
+
+    var totals = { capitalByMonth: {}, prefByMonth: {}, totalByMonth: {} };
+    months.forEach(function (mo) {
+      totals.capitalByMonth[mo] = round2(sum(members.map(function (m) { return m.capitalByMonth[mo]; })));
+      totals.prefByMonth[mo] = round2(sum(members.map(function (m) { return m.prefByMonth[mo]; })));
+      totals.totalByMonth[mo] = round2(sum(members.map(function (m) { return m.totalByMonth[mo]; })));
+    });
+
+    members.forEach(function (m) {
+      m.ownershipByMonth = {};
+      months.forEach(function (mo) {
+        var totalCap = totals.capitalByMonth[mo];
+        m.ownershipByMonth[mo] = totalCap > 0 ? round2((m.capitalByMonth[mo] / totalCap) * 100) : 0;
+      });
+    });
+
+    return { months: months, members: members, totals: totals };
+  }
+
   // Budget items share the same {scheduleMode, payments, startDate, endDate, totalBudget}
   // shape as line items, so getLineItemSchedule() works on either.
   function mergeSchedules(scheduleArrays) {
@@ -1682,7 +1745,7 @@
   function renderTabs() {
     var tabs = [
       ["summary", "Summary"], ["cashflow", "Cashflow"], ["line-items", "Line Items"],
-      ["budget", "Budget"], ["draws", "Draws"], ["cap-table", "Cap Table"],
+      ["budget", "Budget"], ["draws", "Draws"], ["cap-table", "Cap Table"], ["cap-table-detail", "Cap Table Detail"],
     ];
     document.getElementById("tabs").innerHTML = tabs.map(function (t) {
       return '<button class="tab' + (activeTab === t[0] ? " tab--active" : "") + '" data-tab="' + t[0] + '">' + t[1] + "</button>";
@@ -1702,6 +1765,7 @@
     else if (activeTab === "budget") renderBudgetTab(el);
     else if (activeTab === "draws") renderDrawsTab(el);
     else if (activeTab === "cap-table") renderCapTableTab(el);
+    else if (activeTab === "cap-table-detail") renderCapTableDetailTab(el);
   }
 
   // ---------- Cashflow (chart + monthly grid) ----------
@@ -2970,13 +3034,22 @@
       html += "<tr><td>" + fmtDate(c.date) + "</td><td>" + fmtMoney(c.amount, true) + "</td><td>" + esc(c.note || "") + '</td><td><button class="link-button" data-remove-contribution="' + member.id + "|" + c.id + '">remove</button></td></tr>';
     });
     html += '<tr><td><input type="date" data-new-contribution-date="' + member.id + '" /></td><td><input type="number" placeholder="0.00" data-new-contribution-amount="' + member.id + '" /></td>' +
-      '<td colspan="2"><button class="link-button" data-add-contribution="' + member.id + '">add</button></td></tr></tbody></table></div>';
+      '<td><input type="text" placeholder="note" data-new-contribution-note="' + member.id + '" /></td>' +
+      '<td><button class="link-button" data-add-contribution="' + member.id + '">add</button></td></tr></tbody></table></div>';
     html += '<div class="ledger__column"><h4>Distributions (draws)</h4><table class="mini-table"><tbody>';
     member.distributions.forEach(function (d) {
       html += "<tr><td>" + fmtDate(d.date) + "</td><td>" + fmtMoney(d.amount, true) + "</td><td>" + esc(d.note || "") + '</td><td><button class="link-button" data-remove-distribution="' + member.id + "|" + d.id + '">remove</button></td></tr>';
     });
     html += '<tr><td><input type="date" data-new-distribution-date="' + member.id + '" /></td><td><input type="number" placeholder="0.00" data-new-distribution-amount="' + member.id + '" /></td>' +
-      '<td colspan="2"><button class="link-button" data-add-distribution="' + member.id + '">add</button></td></tr></tbody></table></div></div>';
+      '<td><input type="text" placeholder="note" data-new-distribution-note="' + member.id + '" /></td>' +
+      '<td><button class="link-button" data-add-distribution="' + member.id + '">add</button></td></tr></tbody></table></div>';
+    html += '<div class="ledger__column"><h4>Capital Returns</h4><table class="mini-table"><tbody>';
+    (member.capitalReturns || []).forEach(function (r) {
+      html += "<tr><td>" + fmtDate(r.date) + "</td><td>" + fmtMoney(r.amount, true) + "</td><td>" + esc(r.note || "") + '</td><td><button class="link-button" data-remove-capitalreturn="' + member.id + "|" + r.id + '">remove</button></td></tr>';
+    });
+    html += '<tr><td><input type="date" data-new-capitalreturn-date="' + member.id + '" /></td><td><input type="number" placeholder="0.00" data-new-capitalreturn-amount="' + member.id + '" /></td>' +
+      '<td><input type="text" placeholder="note" data-new-capitalreturn-note="' + member.id + '" /></td>' +
+      '<td><button class="link-button" data-add-capitalreturn="' + member.id + '">add</button></td></tr></tbody></table></div></div>';
     return html;
   }
 
@@ -3013,7 +3086,7 @@
     });
     var addMemberBtn = root.querySelector("#addMemberBtn");
     if (addMemberBtn) addMemberBtn.addEventListener("click", function () {
-      project.capTable.push({ id: genId("member"), name: "Member " + (project.capTable.length + 1), role: "LP", ownershipPercent: null, sortOrder: project.capTable.length, contributions: [], distributions: [] });
+      project.capTable.push({ id: genId("member"), name: "Member " + (project.capTable.length + 1), role: "LP", ownershipPercent: null, sortOrder: project.capTable.length, contributions: [], distributions: [], capitalReturns: [] });
       render();
       persist();
     });
@@ -3022,8 +3095,9 @@
         var id = btn.getAttribute("data-add-contribution");
         var dateInput = root.querySelector('[data-new-contribution-date="' + id + '"]');
         var amountInput = root.querySelector('[data-new-contribution-amount="' + id + '"]');
+        var noteInput = root.querySelector('[data-new-contribution-note="' + id + '"]');
         if (!amountInput.value) return;
-        findMember(id).contributions.push({ id: genId("contrib"), date: dateInput.value || new Date().toISOString().slice(0, 10), amount: Number(amountInput.value), note: "" });
+        findMember(id).contributions.push({ id: genId("contrib"), date: dateInput.value || new Date().toISOString().slice(0, 10), amount: Number(amountInput.value), note: noteInput.value || "" });
         render();
         persist();
       });
@@ -3042,8 +3116,9 @@
         var id = btn.getAttribute("data-add-distribution");
         var dateInput = root.querySelector('[data-new-distribution-date="' + id + '"]');
         var amountInput = root.querySelector('[data-new-distribution-amount="' + id + '"]');
+        var noteInput = root.querySelector('[data-new-distribution-note="' + id + '"]');
         if (!amountInput.value) return;
-        findMember(id).distributions.push({ id: genId("dist"), date: dateInput.value || new Date().toISOString().slice(0, 10), amount: Number(amountInput.value), note: "" });
+        findMember(id).distributions.push({ id: genId("dist"), date: dateInput.value || new Date().toISOString().slice(0, 10), amount: Number(amountInput.value), note: noteInput.value || "" });
         render();
         persist();
       });
@@ -3053,6 +3128,29 @@
         var parts = btn.getAttribute("data-remove-distribution").split("|");
         var m = findMember(parts[0]);
         m.distributions = m.distributions.filter(function (d) { return d.id !== parts[1]; });
+        render();
+        persist();
+      });
+    });
+    root.querySelectorAll("[data-add-capitalreturn]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-add-capitalreturn");
+        var dateInput = root.querySelector('[data-new-capitalreturn-date="' + id + '"]');
+        var amountInput = root.querySelector('[data-new-capitalreturn-amount="' + id + '"]');
+        var noteInput = root.querySelector('[data-new-capitalreturn-note="' + id + '"]');
+        if (!amountInput.value) return;
+        var m = findMember(id);
+        if (!m.capitalReturns) m.capitalReturns = [];
+        m.capitalReturns.push({ id: genId("capret"), date: dateInput.value || new Date().toISOString().slice(0, 10), amount: Number(amountInput.value), note: noteInput.value || "" });
+        render();
+        persist();
+      });
+    });
+    root.querySelectorAll("[data-remove-capitalreturn]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var parts = btn.getAttribute("data-remove-capitalreturn").split("|");
+        var m = findMember(parts[0]);
+        m.capitalReturns = m.capitalReturns.filter(function (r) { return r.id !== parts[1]; });
         render();
         persist();
       });
@@ -3067,6 +3165,108 @@
         if (s.amount === 0) return;
         findMember(s.memberId).distributions.push({ id: genId("dist"), date: date, amount: s.amount, note: "Auto-split distribution" });
       });
+      render();
+      persist();
+    });
+  }
+
+  // ---------- Cap Table Detail (pref accrual / capital account waterfall) ----------
+  function renderCapTableDetailTab(el) {
+    var wrap = document.createElement("div");
+    wrap.className = "section";
+
+    var settings = project.capTableSettings;
+    var intro = document.createElement("p");
+    intro.className = "section__intro";
+    intro.textContent = "Monthly capital account and preferred return accrual per member, to help work out what each member is owed at exit. Manage contributions, distributions, and capital returns on the Cap Table tab.";
+    wrap.appendChild(intro);
+
+    var settingsEl = document.createElement("div");
+    settingsEl.className = "recurring-draws";
+    settingsEl.style.marginBottom = "20px";
+    settingsEl.innerHTML = '<div class="recurring-draws__form">' +
+      '<label>Preferred return % (annual)<input type="number" step="0.01" min="0" id="capPrefPercent" value="' + (settings.prefPercent || 0) + '" /></label>' +
+      '<label>Calendar start<input type="date" id="capStartDate" value="' + esc(settings.startDate || "") + '" /></label>' +
+      '<label>Calendar end<input type="date" id="capEndDate" value="' + esc(settings.endDate || "") + '" /></label>' +
+      "</div>";
+    wrap.appendChild(settingsEl);
+
+    if (project.capTable.length === 0 || !settings.startDate || !settings.endDate) {
+      var empty = document.createElement("p");
+      empty.className = "section__intro";
+      empty.textContent = project.capTable.length === 0
+        ? "Add cap table members on the Cap Table tab first."
+        : "Set a calendar start and end date above to see the monthly breakdown.";
+      wrap.appendChild(empty);
+      el.appendChild(wrap);
+      wireCapTableDetailEvents(wrap);
+      return;
+    }
+
+    var detail = computeCapTableDetail(project);
+    var gridWrap = document.createElement("div");
+    gridWrap.className = "summary-grid-wrap";
+    var html = '<table class="summary-grid"><thead><tr><th class="summary-grid__label">Member / metric</th>';
+    detail.months.forEach(function (m, i) {
+      html += '<th class="col-money"><span class="summary-grid__monthnum">Month ' + (i + 1) + '</span><span class="summary-grid__monthlabel">' + fmtMonth(m) + "</span></th>";
+    });
+    html += "</tr></thead><tbody>";
+
+    detail.members.forEach(function (m) {
+      html += '<tr class="summary-grid__category"><td class="summary-grid__label">' + esc(m.name) + " (" + esc(m.role) + ")</td>";
+      detail.months.forEach(function () { html += '<td class="col-money"></td>'; });
+      html += "</tr>";
+
+      html += '<tr><td class="summary-grid__label">Capital Contributions</td>';
+      detail.months.forEach(function (mo) { html += '<td class="col-money">' + (m.capitalByMonth[mo] ? fmtMoney(m.capitalByMonth[mo]) : "") + "</td>"; });
+      html += "</tr>";
+
+      html += '<tr><td class="summary-grid__label">Pref Accrual</td>';
+      detail.months.forEach(function (mo) { html += '<td class="col-money">' + (m.prefByMonth[mo] ? fmtMoney(m.prefByMonth[mo]) : "") + "</td>"; });
+      html += "</tr>";
+
+      html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Pref + Capital</td>';
+      detail.months.forEach(function (mo) { html += '<td class="col-money">' + (m.totalByMonth[mo] ? fmtMoney(m.totalByMonth[mo]) : "") + "</td>"; });
+      html += "</tr>";
+
+      html += '<tr><td class="summary-grid__label">% Ownership</td>';
+      detail.months.forEach(function (mo) { html += '<td class="col-money">' + (m.ownershipByMonth[mo] ? m.ownershipByMonth[mo].toFixed(2) + "%" : "") + "</td>"; });
+      html += "</tr>";
+    });
+
+    html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Total Capital</td>';
+    detail.months.forEach(function (mo) { html += '<td class="col-money">' + fmtMoney(detail.totals.capitalByMonth[mo]) + "</td>"; });
+    html += "</tr>";
+    html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Total Pref Accrued</td>';
+    detail.months.forEach(function (mo) { html += '<td class="col-money">' + fmtMoney(detail.totals.prefByMonth[mo]) + "</td>"; });
+    html += "</tr>";
+    html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Total Pref + Capital</td>';
+    detail.months.forEach(function (mo) { html += '<td class="col-money">' + fmtMoney(detail.totals.totalByMonth[mo]) + "</td>"; });
+    html += "</tr></tbody></table>";
+
+    gridWrap.innerHTML = html;
+    wrap.appendChild(gridWrap);
+
+    el.appendChild(wrap);
+    wireCapTableDetailEvents(wrap);
+  }
+
+  function wireCapTableDetailEvents(root) {
+    var prefInput = root.querySelector("#capPrefPercent");
+    if (prefInput) prefInput.addEventListener("change", function () {
+      project.capTableSettings.prefPercent = Number(prefInput.value) || 0;
+      render();
+      persist();
+    });
+    var startInput = root.querySelector("#capStartDate");
+    if (startInput) startInput.addEventListener("change", function () {
+      project.capTableSettings.startDate = startInput.value || null;
+      render();
+      persist();
+    });
+    var endInput = root.querySelector("#capEndDate");
+    if (endInput) endInput.addEventListener("change", function () {
+      project.capTableSettings.endDate = endInput.value || null;
       render();
       persist();
     });
