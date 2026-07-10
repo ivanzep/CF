@@ -221,6 +221,12 @@
   .cf-color-menu { position: fixed; z-index: 200; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); padding: 8px; display: flex; flex-direction: column; gap: 6px; }
   .cf-color-menu label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); }
   .cf-color-menu input[type="color"] { width: 32px; height: 24px; padding: 0; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 300; padding: 24px; }
+  .modal-card { background: var(--surface); border-radius: 10px; padding: 24px; max-width: 720px; width: 100%; max-height: 85vh; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+  .modal-card h2 { margin: 0 0 12px; }
+  .modal-card h3 { margin: 0 0 8px; font-size: 13px; color: var(--text-secondary); }
+  .modal-card__actions { display: flex; align-items: center; gap: 16px; margin-top: 20px; }
+  .csv-import-mapping select { width: 220px; }
   .cashflow-table-section--full { width: 100vw; max-width: 100vw; box-sizing: border-box; margin-left: calc(-50vw + 50%); margin-right: calc(-50vw + 50%); padding: 0 24px; }
   .summary-grid__expand-toggle { background: none; border: none; cursor: pointer; padding: 0 6px 0 0; color: var(--text-muted); font-size: 10px; vertical-align: middle; }
   .summary-grid__expand-toggle:hover { color: var(--text-primary); }
@@ -2147,7 +2153,17 @@
         persist();
       }
     });
-    wrap.appendChild(addCatBtn);
+    var importBtn = document.createElement("button");
+    importBtn.className = "secondary-button";
+    importBtn.textContent = "Import CSV";
+    importBtn.addEventListener("click", function () { openCsvImport("lineItems"); });
+
+    var actionsRow = document.createElement("div");
+    actionsRow.style.display = "flex";
+    actionsRow.style.gap = "12px";
+    actionsRow.appendChild(addCatBtn);
+    actionsRow.appendChild(importBtn);
+    wrap.appendChild(actionsRow);
 
     el.appendChild(wrap);
     wireLineItemEvents(el);
@@ -2372,7 +2388,17 @@
         persist();
       }
     });
-    wrap.appendChild(addSecBtn);
+    var importBudgetBtn = document.createElement("button");
+    importBudgetBtn.className = "secondary-button";
+    importBudgetBtn.textContent = "Import CSV";
+    importBudgetBtn.addEventListener("click", function () { openCsvImport("budgetItems"); });
+
+    var budgetActionsRow = document.createElement("div");
+    budgetActionsRow.style.display = "flex";
+    budgetActionsRow.style.gap = "12px";
+    budgetActionsRow.appendChild(addSecBtn);
+    budgetActionsRow.appendChild(importBudgetBtn);
+    wrap.appendChild(budgetActionsRow);
 
     el.appendChild(wrap);
     wireBudgetEvents(el);
@@ -2525,6 +2551,259 @@
         persist();
       });
     });
+  }
+
+  // ---------- CSV import (Line Items / Budget Items) ----------
+  var csvImportState = null; // { kind, headers, rows, mapping, fileName }
+
+  var CSV_IMPORT_FIELDS = {
+    lineItems: [
+      { key: "category", label: "Category", required: false, aliases: ["category", "cat", "section"] },
+      { key: "code", label: "Code", required: false, aliases: ["code", "item code", "line item code"] },
+      { key: "description", label: "Description", required: true, aliases: ["description", "desc", "name", "line item", "item"] },
+      { key: "totalBudget", label: "Budget", required: false, aliases: ["budget", "total budget", "amount", "total"] },
+      { key: "startDate", label: "Start Date", required: false, aliases: ["start date", "start", "startdate"] },
+      { key: "endDate", label: "End Date", required: false, aliases: ["end date", "end", "enddate"] },
+    ],
+    budgetItems: [
+      { key: "section", label: "Section", required: false, aliases: ["section", "group", "category"] },
+      { key: "description", label: "Description", required: true, aliases: ["description", "desc", "name", "contract", "expense"] },
+      { key: "linkedLineItem", label: "Linked Cash Flow Line Item", required: false, aliases: ["linked line item", "line item", "cash flow line", "cashflow line", "link", "code"] },
+      { key: "totalBudget", label: "Budget", required: false, aliases: ["budget", "total budget", "amount", "total"] },
+      { key: "startDate", label: "Start Date", required: false, aliases: ["start date", "start", "startdate"] },
+      { key: "endDate", label: "End Date", required: false, aliases: ["end date", "end", "enddate"] },
+    ],
+  };
+
+  // Char-by-char CSV parser (handles quoted fields with embedded commas/newlines/escaped quotes).
+  function parseCsv(text) {
+    var rows = [], row = [], field = "", inQuotes = false, i = 0, len = text.length;
+    while (i < len) {
+      var c = text[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+          inQuotes = false; i++; continue;
+        }
+        field += c; i++; continue;
+      }
+      if (c === '"') { inQuotes = true; i++; continue; }
+      if (c === ",") { row.push(field); field = ""; i++; continue; }
+      if (c === "\r") { i++; continue; }
+      if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
+      field += c; i++;
+    }
+    if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+    return rows.filter(function (r) { return r.some(function (c) { return c !== ""; }); });
+  }
+
+  function normalizeCsvHeader(h) { return String(h || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+
+  function autoMapCsvColumns(headers, fieldDefs) {
+    var used = {}, mapping = {};
+    fieldDefs.forEach(function (fdef) {
+      var aliasSet = fdef.aliases.map(normalizeCsvHeader);
+      var matchIdx = headers.findIndex(function (h, idx) { return !used[idx] && aliasSet.indexOf(normalizeCsvHeader(h)) !== -1; });
+      mapping[fdef.key] = matchIdx !== -1 ? matchIdx : null;
+      if (matchIdx !== -1) used[matchIdx] = true;
+    });
+    return mapping;
+  }
+
+  function parseCsvNumber(str) {
+    if (!str) return 0;
+    var n = Number(String(str).replace(/[$,]/g, "").trim());
+    return isNaN(n) ? 0 : n;
+  }
+  function parseCsvDate(str) {
+    if (!str) return null;
+    var s = String(str).trim();
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    var d = new Date(s);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 10);
+  }
+
+  function openCsvImport(kind) {
+    csvImportState = { kind: kind, headers: [], rows: [], mapping: {}, fileName: "" };
+    renderCsvImportModal();
+  }
+  function closeCsvImport() {
+    csvImportState = null;
+    var el = document.getElementById("csvImportOverlay");
+    if (el) el.remove();
+  }
+
+  function renderCsvImportModal() {
+    var existing = document.getElementById("csvImportOverlay");
+    if (existing) existing.remove();
+    if (!csvImportState) return;
+
+    var overlay = document.createElement("div");
+    overlay.id = "csvImportOverlay";
+    overlay.className = "modal-overlay";
+
+    var card = document.createElement("div");
+    card.className = "modal-card";
+
+    var title = csvImportState.kind === "lineItems" ? "Import Line Items from CSV" : "Import Budget Items from CSV";
+    var html = "<h2>" + title + "</h2>";
+
+    if (csvImportState.rows.length === 0) {
+      html += '<p class="section__intro">Choose a comma-delimited CSV file. The first row should be column headers.</p>' +
+        '<input type="file" id="csvFileInput" accept=".csv,text/csv" />' +
+        '<div class="modal-card__actions"><button class="link-button" id="csvImportCancelBtn">Cancel</button></div>';
+    } else {
+      var fieldDefs = CSV_IMPORT_FIELDS[csvImportState.kind];
+      html += '<p class="section__intro">' + esc(csvImportState.fileName) + " — " + csvImportState.rows.length + " row" + (csvImportState.rows.length === 1 ? "" : "s") +
+        ". Map each field below to a column from your CSV, then import.</p>";
+      html += '<table class="mini-table csv-import-mapping"><thead><tr><th>Field</th><th>CSV column</th></tr></thead><tbody>';
+      fieldDefs.forEach(function (fdef) {
+        html += "<tr><td>" + esc(fdef.label) + (fdef.required ? " *" : "") + '</td><td><select data-csv-map-field="' + fdef.key + '">' +
+          '<option value="">— skip —</option>' +
+          csvImportState.headers.map(function (h, idx) {
+            return '<option value="' + idx + '"' + (csvImportState.mapping[fdef.key] === idx ? " selected" : "") + ">" + esc(h) + "</option>";
+          }).join("") +
+          "</select></td></tr>";
+      });
+      html += "</tbody></table>";
+
+      html += '<h3 style="margin-top:16px;">Preview (first 3 rows)</h3>';
+      html += '<div style="overflow:auto;max-height:200px;"><table class="mini-table"><thead><tr>' +
+        fieldDefs.map(function (fdef) { return "<th>" + esc(fdef.label) + "</th>"; }).join("") +
+        "</tr></thead><tbody>";
+      csvImportState.rows.slice(0, 3).forEach(function (row) {
+        html += "<tr>" + fieldDefs.map(function (fdef) {
+          var idx = csvImportState.mapping[fdef.key];
+          return "<td>" + (idx == null ? "" : esc(row[idx] || "")) + "</td>";
+        }).join("") + "</tr>";
+      });
+      html += "</tbody></table></div>";
+
+      html += '<div class="modal-card__actions">' +
+        '<button class="secondary-button" id="csvImportCommitBtn">Import ' + csvImportState.rows.length + " row" + (csvImportState.rows.length === 1 ? "" : "s") + "</button>" +
+        '<button class="link-button" id="csvImportCancelBtn">Cancel</button>' +
+        "</div>";
+    }
+
+    card.innerHTML = html;
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    var fileInput = document.getElementById("csvFileInput");
+    if (fileInput) {
+      fileInput.addEventListener("change", function () {
+        var file = fileInput.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+          var parsed = parseCsv(String(reader.result));
+          if (parsed.length < 1) { alert("Could not find any rows in that file."); return; }
+          csvImportState.headers = parsed[0];
+          csvImportState.rows = parsed.slice(1);
+          csvImportState.fileName = file.name;
+          csvImportState.mapping = autoMapCsvColumns(csvImportState.headers, CSV_IMPORT_FIELDS[csvImportState.kind]);
+          renderCsvImportModal();
+        };
+        reader.readAsText(file);
+      });
+    }
+    document.querySelectorAll("[data-csv-map-field]").forEach(function (sel) {
+      sel.addEventListener("change", function () {
+        csvImportState.mapping[sel.getAttribute("data-csv-map-field")] = sel.value === "" ? null : Number(sel.value);
+      });
+    });
+    var cancelBtn = document.getElementById("csvImportCancelBtn");
+    if (cancelBtn) cancelBtn.addEventListener("click", closeCsvImport);
+    var commitBtn = document.getElementById("csvImportCommitBtn");
+    if (commitBtn) commitBtn.addEventListener("click", commitCsvImport);
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) closeCsvImport(); });
+  }
+
+  function commitCsvImport() {
+    var state = csvImportState;
+    if (!state) return;
+    var mapping = state.mapping;
+    var cell = function (row, key) { var idx = mapping[key]; return idx == null ? "" : (row[idx] || "").trim(); };
+
+    if (state.kind === "lineItems") {
+      var catByName = {};
+      project.categories.forEach(function (c) { catByName[c.name.toLowerCase()] = c.id; });
+      var imported = 0, skipped = 0, newCats = 0;
+      state.rows.forEach(function (row) {
+        var description = cell(row, "description");
+        if (!description) { skipped++; return; }
+        var catName = cell(row, "category");
+        var categoryId = null;
+        if (catName) {
+          var key = catName.toLowerCase();
+          if (catByName[key]) categoryId = catByName[key];
+          else {
+            categoryId = genId("cat");
+            project.categories.push({ id: categoryId, name: catName, sortOrder: project.categories.length });
+            catByName[key] = categoryId;
+            newCats++;
+          }
+        }
+        project.lineItems.push({
+          id: genId("li"), categoryId: categoryId, code: cell(row, "code"), description: description,
+          totalBudget: parseCsvNumber(cell(row, "totalBudget")), scheduleMode: "EVEN",
+          startDate: parseCsvDate(cell(row, "startDate")), endDate: parseCsvDate(cell(row, "endDate")),
+          sortOrder: project.lineItems.length, payments: [], color: null,
+        });
+        imported++;
+      });
+      closeCsvImport();
+      render();
+      persist();
+      showToast("Imported " + imported + " line item" + (imported === 1 ? "" : "s") +
+        (skipped ? ", " + skipped + " skipped (no description)" : "") +
+        (newCats ? ", " + newCats + " new categor" + (newCats === 1 ? "y" : "ies") : ""));
+    } else {
+      var secByName = {};
+      project.budgetSections.forEach(function (s) { secByName[s.name.toLowerCase()] = s.id; });
+      var importedB = 0, skippedB = 0, newSecs = 0, unmatched = 0;
+      state.rows.forEach(function (row) {
+        var description = cell(row, "description");
+        if (!description) { skippedB++; return; }
+        var secName = cell(row, "section");
+        var sectionId = null;
+        if (secName) {
+          var key = secName.toLowerCase();
+          if (secByName[key]) sectionId = secByName[key];
+          else {
+            sectionId = genId("bsec");
+            project.budgetSections.push({ id: sectionId, name: secName, sortOrder: project.budgetSections.length });
+            secByName[key] = sectionId;
+            newSecs++;
+          }
+        }
+        var linkText = cell(row, "linkedLineItem");
+        var linkedLineItemId = null;
+        if (linkText) {
+          var lt = linkText.toLowerCase();
+          var match = project.lineItems.filter(function (li) { return (li.code || "").toLowerCase() === lt; })[0] ||
+            project.lineItems.filter(function (li) { return li.description.toLowerCase() === lt; })[0];
+          if (match) linkedLineItemId = match.id;
+          else unmatched++;
+        }
+        project.budgetItems.push({
+          id: genId("bi"), sectionId: sectionId, description: description, linkedLineItemId: linkedLineItemId,
+          totalBudget: parseCsvNumber(cell(row, "totalBudget")), scheduleMode: "EVEN",
+          startDate: parseCsvDate(cell(row, "startDate")), endDate: parseCsvDate(cell(row, "endDate")),
+          sortOrder: project.budgetItems.length, payments: [],
+        });
+        importedB++;
+      });
+      closeCsvImport();
+      render();
+      persist();
+      showToast("Imported " + importedB + " budget item" + (importedB === 1 ? "" : "s") +
+        (skippedB ? ", " + skippedB + " skipped (no description)" : "") +
+        (unmatched ? ", " + unmatched + " unlinked (no matching line item)" : "") +
+        (newSecs ? ", " + newSecs + " new section" + (newSecs === 1 ? "" : "s") : ""));
+    }
   }
 
   // ---------- Draws ----------
