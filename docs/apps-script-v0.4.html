@@ -271,7 +271,9 @@
   .cf-timeline-controls__range input[type="range"] { width: 96px; accent-color: var(--accent); }
   .cf-timeline-controls__range span { min-width: 34px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
   .cf-timeline-wrap { overflow: auto; max-height: 70vh; border: 1px solid var(--border); border-radius: 8px; width: fit-content; max-width: 100%; }
-  .cf-heatmap { border-collapse: separate; border-spacing: 0; font-size: 12px; }
+  /* max-content keeps the month columns at their intended size instead of letting
+     auto table layout spread them across whatever container the table lands in. */
+  .cf-heatmap { border-collapse: separate; border-spacing: 0; font-size: 12px; width: max-content; }
   .cf-heatmap th, .cf-heatmap td { padding: 0; white-space: nowrap; }
   .cf-heatmap thead th { position: sticky; top: 0; background: var(--surface); z-index: 2; color: var(--text-muted); font-weight: 500; }
   .cf-heatmap__label {
@@ -284,7 +286,11 @@
   .cf-heatmap__yearhead { text-align: center; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border); padding: 3px 0 !important; }
   .cf-heatmap__yearhead--b { background: var(--year-shade); }
   .cf-heatmap__monthhead { text-align: center; font-size: 9px; padding: 2px 0 !important; border-bottom: 1px solid var(--border); }
-  .cf-heatmap__cell { padding: calc(var(--pill-gap, 4px) / 2) !important; cursor: pointer; }
+  .cf-heatmap__cell {
+    padding: calc(var(--pill-gap, 4px) / 2) !important; cursor: pointer;
+    width: calc(var(--pill-w, 22px) + var(--pill-gap, 4px));
+    min-width: calc(var(--pill-w, 22px) + var(--pill-gap, 4px));
+  }
   .cf-heatmap__cell--empty { cursor: default; }
   .cf-heatmap__pill {
     display: block; width: var(--pill-w, 22px); height: var(--pill-h, 12px);
@@ -340,23 +346,36 @@
   .signed-in-bar { display: flex; align-items: center; gap: 12px; justify-content: center; padding: 6px 24px; font-size: 11.5px; color: var(--text-muted); border-bottom: 1px solid var(--border); }
 
   /* On-screen print preview (mirrors the @media print rules below, live) */
-  .print-preview-bar { position: sticky; top: 0; z-index: 100; display: flex; flex-direction: column; gap: 8px; background: var(--accent); color: #fff; padding: 10px 24px; }
+  .print-preview-bar {
+    position: sticky; top: 0; z-index: 100; display: flex; flex-direction: column; gap: 8px;
+    background: var(--surface); color: var(--text-primary);
+    border-bottom: 1px solid var(--border-strong); box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    padding: 10px 24px;
+  }
   #ppSettingsPanel { display: flex; flex-direction: column; gap: 8px; }
   .print-preview-bar__row { display: flex; align-items: center; gap: 12px; }
   .print-preview-bar__label { font-weight: 600; flex: 1; }
 
   /* ---- grouped print settings ---- */
   .pp-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; align-items: start; }
-  .pp-group { background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.22); border-radius: 8px; overflow: hidden; }
+  .pp-group { background: var(--page); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .pp-group--collapsed .pp-group__body { display: none; }
   /* Always the full width of whatever column count auto-fit lands on, so the
      section rows never get squeezed into a single narrow column. */
   .pp-group--sections { grid-column: 1 / -1; }
   .pp-group__title {
-    display: flex; align-items: baseline; gap: 8px; padding: 6px 10px;
-    background: rgba(0,0,0,0.14); font-size: 10.5px; font-weight: 700;
+    display: flex; align-items: center; gap: 8px; padding: 5px 8px 5px 4px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    font-size: 10.5px; font-weight: 700; color: var(--text-secondary);
     text-transform: uppercase; letter-spacing: 0.06em;
   }
-  .pp-group__title-note { font-weight: 400; text-transform: none; letter-spacing: 0; opacity: 0.7; font-size: 10px; }
+  .pp-group--collapsed .pp-group__title { border-bottom-color: transparent; }
+  .pp-group__toggle {
+    flex: 0 0 auto; width: 20px; height: 20px; padding: 0 !important;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; line-height: 1;
+  }
+  .pp-group__title-note { font-weight: 400; text-transform: none; letter-spacing: 0; opacity: 0.65; font-size: 10px; }
   .pp-group__body { display: flex; flex-wrap: wrap; gap: 8px 12px; padding: 9px 10px; font-size: 11px; }
   .pp-group__hint { flex: 1 1 100%; margin: 0; font-size: 10px; opacity: 0.7; line-height: 1.4; }
   .pp-field { display: flex; flex-direction: column; gap: 3px; opacity: 0.95; }
@@ -364,11 +383,11 @@
   .pp-field__legend { opacity: 0.95; }
   .pp-group select, .pp-group input[type="number"], .pp-group input[type="text"] {
     font-size: 12px; padding: 3px 5px; border-radius: 4px;
-    border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.16); color: #fff;
+    border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-primary);
   }
   .pp-group select, .pp-group input[type="number"] { width: 100%; min-width: 68px; }
   .pp-group input[type="text"] { width: 100%; }
-  .pp-group select option { color: #0b0b0b; }
+  .pp-group__body, .pp-field, .pp-check { color: var(--text-secondary); }
   .pp-check { display: flex; flex-direction: row; align-items: center; gap: 6px; opacity: 0.95; }
   .pp-margins { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
   .pp-margins label { display: flex; flex-direction: column; gap: 2px; font-size: 10px; opacity: 0.85; }
@@ -378,7 +397,7 @@
   .pp-sections { flex: 1 1 100%; display: flex; flex-direction: column; gap: 4px; }
   .pp-section-row {
     display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px;
-    padding: 3px 6px; border-radius: 6px; background: rgba(255,255,255,0.08);
+    padding: 3px 6px; border-radius: 6px; background: var(--surface); border: 1px solid var(--border);
   }
   .pp-section-row--off { opacity: 0.55; }
   .pp-section-row__move { display: flex; gap: 2px; }
@@ -392,8 +411,12 @@
   .pp-section-row select { width: auto; min-width: 92px; }
   .pp-reset { flex: 0 0 auto; font-size: 11px; padding: 4px 10px !important; margin-top: 2px; }
   .print-pages__zoom-auto { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.6; }
-  .print-preview-bar button { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
-  .print-preview-bar button:hover { background: rgba(255,255,255,0.25); }
+  .print-preview-bar button {
+    background: var(--surface); color: var(--text-primary);
+    border: 1px solid var(--border-strong); border-radius: 6px; padding: 6px 12px; cursor: pointer;
+  }
+  .print-preview-bar button:hover { background: var(--page); border-color: var(--accent); }
+  .print-preview-bar__label { color: var(--text-primary); }
   .print-preview-mode { background: #fff; font-size: calc(1em * var(--print-font-scale, 1)); }
   .print-preview-mode.print-grayscale .print-pages { filter: grayscale(1); }
   .print-preview-mode .app-topbar, .print-preview-mode .tabs, .print-preview-mode .signed-in-bar { display: none !important; }
@@ -550,7 +573,7 @@
     <div id="ppSettingsPanel">
       <div class="pp-groups">
         <div class="pp-group">
-          <div class="pp-group__title">Page</div>
+          <div class="pp-group__title"><button type="button" class="pp-group__toggle" data-pp-group="page">▾</button>Page</div>
           <div class="pp-group__body">
             <label class="pp-field">Size
               <select id="ppPageSize">
@@ -579,7 +602,7 @@
         </div>
 
         <div class="pp-group">
-          <div class="pp-group__title">Type &amp; layout</div>
+          <div class="pp-group__title"><button type="button" class="pp-group__toggle" data-pp-group="type">▾</button>Type &amp; layout</div>
           <div class="pp-group__body">
             <label class="pp-field">Font size (%)
               <input type="number" step="5" min="50" max="200" id="ppFontScale" value="100" />
@@ -607,7 +630,7 @@
         </div>
 
         <div class="pp-group">
-          <div class="pp-group__title">Branding</div>
+          <div class="pp-group__title"><button type="button" class="pp-group__toggle" data-pp-group="brand">▾</button>Branding</div>
           <div class="pp-group__body">
             <label class="pp-field pp-field--full">Logo URL
               <input type="text" id="ppLogoUrl" placeholder="https://…" />
@@ -618,6 +641,7 @@
 
         <div class="pp-group pp-group--sections">
           <div class="pp-group__title">
+            <button type="button" class="pp-group__toggle" data-pp-group="sections">▾</button>
             Sections
             <span class="pp-group__title-note">order top to bottom · ↑↓ to rearrange</span>
           </div>
@@ -1283,15 +1307,35 @@
       return el.children.length === 1 && el.children[0].tagName === "TABLE";
     }
 
+    // Column widths for the rebuilt (table-layout:fixed) tables. Measuring the first
+    // <thead> row only works when that row has one cell per column; the timeline's
+    // header is two rows deep with a colspan per year, which would yield one very
+    // wide column per year and collapse the rest to zero. So take the widest row
+    // that has no colspans, from the head or the body.
+    function measureColWidths(table) {
+      var rows = Array.prototype.slice.call(table.querySelectorAll("thead tr, tbody tr"));
+      var best = null;
+      rows.forEach(function (tr) {
+        var cells = Array.prototype.slice.call(tr.children);
+        if (!cells.length) return;
+        var hasSpan = cells.some(function (c) { return c.hasAttribute("colspan"); });
+        if (hasSpan) return;
+        if (!best || cells.length > best.length) best = cells;
+      });
+      return best ? best.map(function (c) { return c.offsetWidth; }) : [];
+    }
+
     function pushTableRun(table, wrapperClassName, isFirstUnitOfSection) {
       var headEl = table.querySelector("thead");
       var bodyEl = table.querySelector("tbody");
-      var headRow = headEl ? headEl.querySelector("tr") : null;
-      var colWidths = headRow ? Array.from(headRow.children).map(function (c) { return c.offsetWidth; }) : [];
+      var colWidths = measureColWidths(table);
       var totalWidth = colWidths.reduce(function (a, b) { return a + b; }, 0) || table.offsetWidth;
       var run = {
         runId: "run" + (runCounter++),
         tableClassName: table.className,
+        // Carries inline custom properties (e.g. the timeline's pill sizing) onto the
+        // rebuilt table, which is a fresh element and would otherwise lose them.
+        tableStyle: table.getAttribute("style") || "",
         wrapperClassName: wrapperClassName || null,
         colgroupHtml: colWidths.length
           ? "<colgroup>" + colWidths.map(function (w) { return '<col style="width:' + w + 'px">'; }).join("") + "</colgroup>"
@@ -1455,6 +1499,7 @@
       }
       var table = document.createElement("table");
       table.className = run.tableClassName;
+      if (run.tableStyle) table.setAttribute("style", run.tableStyle);
       table.style.tableLayout = "fixed";
       if (run.totalWidth) table.style.width = run.totalWidth + "px";
       var showHead = headerCost > 0;
@@ -2152,11 +2197,24 @@
     return "rgb(" + c.join(",") + ")";
   }
 
+  // Sizing has to live on the <table> itself, not only on the scroll wrapper:
+  // print pagination flattens a section into individual rows and rebuilds the
+  // table, so anything set on an ancestor is lost. (Hit this as columns
+  // stretching to fill the page whenever a page was wide enough that the
+  // fit-scaling step decided no scaling — and therefore no wrapper — was needed.)
+  function timelineSizingCss() {
+    return "--pill-w:" + timelineSettings.cellLength + "px;" +
+      "--pill-h:" + timelineSettings.cellThickness + "px;" +
+      "--pill-gap:" + timelineSettings.cellGap + "px;" +
+      "--section-gap:" + timelineSettings.sectionGap + "px;";
+  }
   function applyTimelineSizing(el) {
-    el.style.setProperty("--pill-w", timelineSettings.cellLength + "px");
-    el.style.setProperty("--pill-h", timelineSettings.cellThickness + "px");
-    el.style.setProperty("--pill-gap", timelineSettings.cellGap + "px");
-    el.style.setProperty("--section-gap", timelineSettings.sectionGap + "px");
+    [el].concat(Array.prototype.slice.call(el.querySelectorAll(".cf-heatmap"))).forEach(function (node) {
+      node.style.setProperty("--pill-w", timelineSettings.cellLength + "px");
+      node.style.setProperty("--pill-h", timelineSettings.cellThickness + "px");
+      node.style.setProperty("--pill-gap", timelineSettings.cellGap + "px");
+      node.style.setProperty("--section-gap", timelineSettings.sectionGap + "px");
+    });
   }
 
   function timelineRowsFor(summary) {
@@ -2264,7 +2322,7 @@
 
     var maxFor = timelineScaleFor(rows, summary.months, t.scaleBasis);
 
-    var html = '<table class="cf-heatmap"><thead><tr>' +
+    var html = '<table class="cf-heatmap" style="' + timelineSizingCss() + '"><thead><tr>' +
       '<th class="cf-heatmap__label" rowspan="2">Line item</th>' +
       '<th class="cf-heatmap__row-total" rowspan="2">Total</th>';
     uniqueYears.forEach(function (y, yi) {
@@ -3985,6 +4043,15 @@
     persist();
     applyPrintSettingsToDom();
     render();
+  });
+  // The bar is static markup that render() never rebuilds, so a class toggle here
+  // survives every re-render without needing its own state.
+  document.querySelectorAll(".pp-group__toggle").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var group = btn.closest(".pp-group");
+      var collapsed = group.classList.toggle("pp-group--collapsed");
+      btn.textContent = collapsed ? "▸" : "▾";
+    });
   });
   document.getElementById("ppResetOrder").addEventListener("click", function () {
     printSectionOrder = PRINT_SECTION_KEYS.slice();
