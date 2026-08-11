@@ -34,7 +34,7 @@
  */
 
 var TAB_SCHEMA = {
-  Project: ["id", "name", "client", "address", "description", "projectDate", "capTablePrefPercent", "capTableStartDate", "capTableEndDate", "printSettingsJson", "printSectionsJson", "printFitJson", "monthNotesJson"],
+  Project: ["id", "name", "client", "address", "description", "projectDate", "capTablePrefPercent", "capTableStartDate", "capTableEndDate", "printSettingsJson", "printSectionsJson", "printFitJson", "monthNotesJson", "timelineSettingsJson"],
   Categories: ["id", "name", "sortOrder"],
   LineItems: ["id", "categoryId", "code", "description", "totalBudget", "scheduleMode", "startDate", "endDate", "sortOrder", "color"],
   Payments: ["id", "lineItemId", "date", "amount"],
@@ -302,6 +302,7 @@ function getProject() {
     printSections: jsonOrNull_(projectRow[10]),
     printFit: jsonOrNull_(projectRow[11]),
     monthNotes: jsonOrNull_(projectRow[12]) || {},
+    timelineSettings: jsonOrNull_(projectRow[13]),
     categories: readTab_("Categories").map(function (row) {
       return { id: str_(row[0]), name: str_(row[1]), sortOrder: num_(row[2]) };
     }),
@@ -327,7 +328,8 @@ function saveProject(project) {
   var capSettings = project.capTableSettings || {};
   writeTab_("Project", [[project.id, project.name || "", project.client || "", project.address || "", project.description || "", project.projectDate || "",
     capSettings.prefPercent || 0, capSettings.startDate || "", capSettings.endDate || "",
-    JSON.stringify(project.printSettings || {}), JSON.stringify(project.printSections || {}), JSON.stringify(project.printFit || {}), JSON.stringify(project.monthNotes || {})]]);
+    JSON.stringify(project.printSettings || {}), JSON.stringify(project.printSections || {}), JSON.stringify(project.printFit || {}), JSON.stringify(project.monthNotes || {}),
+    JSON.stringify(project.timelineSettings || {})]]);
   writeTab_("Categories", project.categories.map(function (c) { return [c.id, c.name, c.sortOrder]; }));
   writeTab_("LineItems", project.lineItems.map(function (li) {
     return [li.id, li.categoryId || "", li.code || "", li.description, li.totalBudget, li.scheduleMode, li.startDate || "", li.endDate || "", li.sortOrder, li.color || ""];

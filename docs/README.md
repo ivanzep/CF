@@ -21,7 +21,7 @@ as they were and don't get new features.
 
 | Version | Adds |
 |---|---|
-| v0.3 | Cashflow Timeline — a per-row heatmap of the cashflow grid |
+| v0.3 | Timeline tab — the cashflow grid as a pill heatmap, with size/color-scale controls |
 | v0.2 | Budget tab, cashflow row/cell coloring, CSV import, Cap Table Detail |
 | v0.1 | Original cashflow + draws + cap table |
 

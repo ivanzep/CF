@@ -259,6 +259,10 @@
   .cf-timeline__legend-step { width: 16px; height: 10px; border: 1px solid var(--border); border-left: none; }
   .cf-timeline__legend-step:first-child { border-left: 1px solid var(--border); }
   .cf-timeline__hint { font-size: 11px; color: var(--text-muted); margin: 0 0 10px; }
+  .cf-timeline-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 20px; margin: 10px 0; font-size: 12px; color: var(--text-secondary); }
+  .cf-timeline-controls label { display: flex; align-items: center; gap: 6px; }
+  .cf-timeline-controls__range input[type="range"] { width: 96px; accent-color: var(--accent); }
+  .cf-timeline-controls__range span { min-width: 34px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
   .cf-timeline-wrap { overflow: auto; max-height: 70vh; border: 1px solid var(--border); border-radius: 8px; width: fit-content; max-width: 100%; }
   .cf-heatmap { border-collapse: separate; border-spacing: 0; font-size: 12px; }
   .cf-heatmap th, .cf-heatmap td { padding: 0; white-space: nowrap; }
@@ -273,9 +277,13 @@
   .cf-heatmap__yearhead { text-align: center; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border); padding: 3px 0 !important; }
   .cf-heatmap__yearhead--b { background: var(--year-shade); }
   .cf-heatmap__monthhead { text-align: center; font-size: 9px; padding: 2px 0 !important; border-bottom: 1px solid var(--border); }
-  .cf-heatmap__cell { width: 20px; min-width: 20px; height: 18px; border-right: 1px solid var(--page); border-bottom: 1px solid var(--page); background: var(--heat, transparent); cursor: pointer; }
+  .cf-heatmap__cell { padding: calc(var(--pill-gap, 4px) / 2) !important; cursor: pointer; }
   .cf-heatmap__cell--empty { cursor: default; }
-  .cf-heatmap__cell:not(.cf-heatmap__cell--empty):hover { outline: 2px solid var(--text-primary); outline-offset: -2px; }
+  .cf-heatmap__pill {
+    display: block; width: var(--pill-w, 22px); height: var(--pill-h, 12px);
+    border-radius: 999px; background: transparent;
+  }
+  .cf-heatmap__cell:not(.cf-heatmap__cell--empty):hover .cf-heatmap__pill { outline: 2px solid var(--text-primary); outline-offset: 1px; }
   .cf-heatmap__row-total { padding: 0 10px !important; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-muted); background: var(--surface); border-bottom: 1px solid var(--border); }
   .cf-heatmap__category td { font-weight: 600; background: var(--page); border-top: 2px solid var(--border-strong); padding-top: calc(2px + var(--section-gap, 0px)) !important; }
   .cf-heatmap__category td.cf-heatmap__label { background: var(--page); }
@@ -612,8 +620,11 @@
   var expandedCashflowLineItemIds = {};
   var expandedMemberId = null;
   var chartCollapsed = true;
-  var cfTimelineCollapsed = false;
   var projectHeaderCollapsed = true;
+  var timelineSettings = {
+    cellLength: 22, cellThickness: 12, cellGap: 4,
+    scaleBasis: "line", colorScheme: "accent",
+  };
   var highlightCurrentMonth = true;
   var cashflowFullWidth = false;
   var cashflowSectionGapPx = 0;
@@ -765,6 +776,7 @@
     project.printSettings = printSettings;
     project.printSections = printSections;
     project.printFit = printFit;
+    project.timelineSettings = timelineSettings;
     project.monthNotes = monthNotes;
     callApi("saveProject", { project: project }).then(function () {
       isDirty = false;
@@ -785,6 +797,7 @@
     if (!p.printSettings) p.printSettings = null;
     if (!p.printSections) p.printSections = null;
     if (!p.printFit) p.printFit = null;
+    if (!p.timelineSettings) p.timelineSettings = null;
     if (!p.monthNotes) p.monthNotes = {};
     return p;
   }
@@ -793,6 +806,7 @@
     if (project.printSettings) printSettings = Object.assign({}, printSettings, project.printSettings);
     if (project.printSections) printSections = Object.assign({}, printSections, project.printSections);
     if (project.printFit) printFit = Object.assign({}, printFit, project.printFit);
+    if (project.timelineSettings) timelineSettings = Object.assign({}, timelineSettings, project.timelineSettings);
     monthNotes = project.monthNotes || {};
     monthNotesLoadedForId = project.id;
     isDirty = false;
@@ -1793,7 +1807,7 @@
 
   function renderTabs() {
     var tabs = [
-      ["summary", "Summary"], ["cashflow", "Cashflow"], ["line-items", "Line Items"],
+      ["summary", "Summary"], ["cashflow", "Cashflow"], ["timeline", "Timeline"], ["line-items", "Line Items"],
       ["budget", "Budget"], ["draws", "Draws"], ["cap-table", "Cap Table"], ["cap-table-detail", "Cap Table Detail"],
     ];
     document.getElementById("tabs").innerHTML = tabs.map(function (t) {
@@ -1809,6 +1823,7 @@
     el.innerHTML = "";
     if (previewMode) return renderPrintableReport(el);
     if (activeTab === "cashflow") renderCashflowTab(el);
+    else if (activeTab === "timeline") renderTimelineTab(el);
     else if (activeTab === "summary") renderSummaryTab(el);
     else if (activeTab === "line-items") renderLineItemsTab(el);
     else if (activeTab === "budget") renderBudgetTab(el);
@@ -1871,7 +1886,8 @@
   }
 
   function buildCashflowSection(summary, forcePrint, sectionsFilter) {
-    var include = sectionsFilter || { cashflowGraph: true, cashflowTable: true, cashflowTimeline: true };
+    // The timeline lives on its own tab now; it only comes through here for print.
+    var include = sectionsFilter || { cashflowGraph: true, cashflowTable: true };
     var wrap = document.createElement("div");
     wrap.className = "section";
 
@@ -1986,8 +2002,6 @@
     if (!forcePrint) {
       var chartBtn = wrap.querySelector("#chartCollapseBtn");
       if (chartBtn) chartBtn.addEventListener("click", function () { chartCollapsed = !chartCollapsed; render(); });
-      var timelineBtn = wrap.querySelector("#cfTimelineCollapseBtn");
-      if (timelineBtn) timelineBtn.addEventListener("click", function () { cfTimelineCollapsed = !cfTimelineCollapsed; render(); });
       var highlightBtn = wrap.querySelector("#highlightMonthBtn");
       if (highlightBtn) highlightBtn.addEventListener("click", function () { highlightCurrentMonth = !highlightCurrentMonth; render(); });
       var fullWidthBtn = wrap.querySelector("#cfFullWidthBtn");
@@ -2031,11 +2045,35 @@
   }
 
   // ---------- Cashflow timeline (heatmap) ----------
-  // Intensity is normalized per row, so each line's colors describe when that
-  // line is heavy relative to its own peak — not relative to other lines.
-  function heatFill(t) {
+  // "accent" has no stops: it ramps opacity over the theme's accent color so it
+  // follows the user's chosen accent. The rest are fixed multi-hue ramps.
+  var TIMELINE_SCHEMES = {
+    accent: { label: "Accent (single hue)", stops: null },
+    gyr: { label: "Green → Yellow → Red", stops: [[46, 158, 91], [214, 196, 46], [214, 69, 58]] },
+    byr: { label: "Blue → Yellow → Red", stops: [[42, 120, 214], [214, 196, 46], [214, 69, 58]] },
+    cool: { label: "Blue → Cyan → Green", stops: [[37, 99, 235], [6, 182, 212], [34, 197, 94]] },
+    magma: { label: "Purple → Orange → Yellow", stops: [[87, 37, 133], [222, 91, 60], [252, 203, 70]] },
+  };
+
+  function heatFill(t, scheme) {
     if (!(t > 0)) return "transparent";
-    return "color-mix(in srgb, var(--accent) " + Math.round(12 + 88 * Math.min(1, t)) + "%, transparent)";
+    t = Math.min(1, t);
+    var s = TIMELINE_SCHEMES[scheme] || TIMELINE_SCHEMES.accent;
+    // Single-hue: keep a visible floor so small non-zero months don't vanish.
+    if (!s.stops) return "color-mix(in srgb, var(--accent) " + Math.round(12 + 88 * t) + "%, transparent)";
+    var pos = t * (s.stops.length - 1);
+    var i = Math.min(s.stops.length - 2, Math.floor(pos));
+    var f = pos - i;
+    var c = [0, 1, 2].map(function (k) {
+      return Math.round(s.stops[i][k] + (s.stops[i + 1][k] - s.stops[i][k]) * f);
+    });
+    return "rgb(" + c.join(",") + ")";
+  }
+
+  function applyTimelineSizing(el) {
+    el.style.setProperty("--pill-w", timelineSettings.cellLength + "px");
+    el.style.setProperty("--pill-h", timelineSettings.cellThickness + "px");
+    el.style.setProperty("--pill-gap", timelineSettings.cellGap + "px");
   }
 
   function timelineRowsFor(summary) {
@@ -2052,27 +2090,47 @@
     return rows;
   }
 
+  // Returns max(|amount|) for a row. With basis "project" every row of the same
+  // kind shares one max, so line items become comparable against each other;
+  // subtotal and grand-total rows keep their own scales, since folding them into
+  // the same max would flatten every individual line to near-nothing.
+  function timelineScaleFor(rows, months, basis) {
+    if (basis !== "project") {
+      return function (row) {
+        var mx = 0;
+        months.forEach(function (m) { mx = Math.max(mx, Math.abs(row.monthly[m] || 0)); });
+        return mx;
+      };
+    }
+    var maxByKind = { item: 0, subtotal: 0, grandtotal: 0 };
+    rows.forEach(function (row) {
+      if (row.kind === "category") return;
+      months.forEach(function (m) {
+        var v = Math.abs(row.monthly[m] || 0);
+        if (v > maxByKind[row.kind]) maxByKind[row.kind] = v;
+      });
+    });
+    return function (row) { return maxByKind[row.kind] || 0; };
+  }
+
   function buildCashflowTimelineSection(summary, forcePrint) {
+    var t = timelineSettings;
     var section = document.createElement("div");
     section.className = "cf-timeline print-section-boundary print-fit-section";
     section.setAttribute("data-fit-key", "cashflowTimeline");
 
     var legendHtml = '<span class="cf-timeline__legend">low' +
       '<span class="cf-timeline__legend-scale">' +
-      [0.05, 0.3, 0.55, 0.8, 1].map(function (f) {
-        return '<span class="cf-timeline__legend-step" style="background:' + heatFill(f) + ';"></span>';
+      [0.02, 0.25, 0.5, 0.75, 1].map(function (f) {
+        return '<span class="cf-timeline__legend-step" style="background:' + heatFill(f, t.colorScheme) + ';"></span>';
       }).join("") +
       "</span>high</span>";
 
     section.innerHTML =
       '<div class="cf-timeline__header">' +
         "<h3>Cashflow Timeline</h3>" +
-        '<span class="cf-timeline__legend">' + legendHtml +
-          (forcePrint ? "" : '<button class="link-button" id="cfTimelineCollapseBtn">' + (cfTimelineCollapsed ? "▸ expand" : "▾ collapse") + "</button>") +
-        "</span>" +
+        legendHtml +
       "</div>";
-
-    if (!forcePrint && cfTimelineCollapsed) return section;
 
     var rows = timelineRowsFor(summary);
     if (!rows.length) return section;
@@ -2081,10 +2139,41 @@
     var uniqueYears = [];
     summary.months.forEach(function (m) { if (uniqueYears.indexOf(yearOf(m)) === -1) uniqueYears.push(yearOf(m)); });
 
+    if (!forcePrint) {
+      var controls = document.createElement("div");
+      controls.className = "cf-timeline-controls";
+      controls.innerHTML =
+        '<label>Color scale' +
+          '<select id="tlScaleBasis">' +
+            '<option value="line"' + (t.scaleBasis === "line" ? " selected" : "") + ">Relative to each line</option>" +
+            '<option value="project"' + (t.scaleBasis === "project" ? " selected" : "") + ">Relative to entire project</option>" +
+          "</select></label>" +
+        '<label>Scheme<select id="tlColorScheme">' +
+          Object.keys(TIMELINE_SCHEMES).map(function (k) {
+            return '<option value="' + k + '"' + (t.colorScheme === k ? " selected" : "") + ">" + esc(TIMELINE_SCHEMES[k].label) + "</option>";
+          }).join("") +
+        "</select></label>" +
+        '<label class="cf-timeline-controls__range">Length' +
+          '<input type="range" id="tlLength" min="6" max="60" step="1" value="' + t.cellLength + '" />' +
+          '<span id="tlLengthVal">' + t.cellLength + "px</span></label>" +
+        '<label class="cf-timeline-controls__range">Thickness' +
+          '<input type="range" id="tlThickness" min="4" max="40" step="1" value="' + t.cellThickness + '" />' +
+          '<span id="tlThicknessVal">' + t.cellThickness + "px</span></label>" +
+        '<label class="cf-timeline-controls__range">Separation' +
+          '<input type="range" id="tlGap" min="0" max="20" step="1" value="' + t.cellGap + '" />' +
+          '<span id="tlGapVal">' + t.cellGap + "px</span></label>";
+      section.appendChild(controls);
+    }
+
     var hint = document.createElement("p");
     hint.className = "cf-timeline__hint";
-    hint.textContent = "Each row is shaded relative to its own peak month" + (forcePrint ? "." : " — hover a cell for the amount.");
+    hint.textContent = (t.scaleBasis === "project"
+      ? "Shaded across the whole project, so lines are comparable to each other"
+      : "Each row is shaded relative to its own peak month") +
+      (forcePrint ? "." : " — hover a cell for the amount.");
     section.appendChild(hint);
+
+    var maxFor = timelineScaleFor(rows, summary.months, t.scaleBasis);
 
     var html = '<table class="cf-heatmap"><thead><tr>' +
       '<th class="cf-heatmap__label" rowspan="2">Line item</th>' +
@@ -2108,8 +2197,7 @@
           '<td colspan="' + summary.months.length + '"></td></tr>';
         return;
       }
-      var rowMax = 0;
-      summary.months.forEach(function (m) { rowMax = Math.max(rowMax, Math.abs(row.monthly[m] || 0)); });
+      var rowMax = maxFor(row);
       var rowClass = row.kind === "subtotal" ? " class=\"cf-heatmap__subtotal\""
         : row.kind === "grandtotal" ? " class=\"cf-heatmap__grandtotal\"" : "";
       html += "<tr" + rowClass + ">";
@@ -2120,9 +2208,9 @@
         var v = row.monthly[m] || 0;
         var cls = "cf-heatmap__cell" + (v ? "" : " cf-heatmap__cell--empty") +
           (highlightCurrentMonth && m === thisMonth ? " cf-heatmap__current" : "");
-        var style = v ? ' style="--heat:' + heatFill(rowMax > 0 ? Math.abs(v) / rowMax : 0) + ';"' : "";
+        var pillStyle = v ? ' style="background:' + heatFill(rowMax > 0 ? Math.abs(v) / rowMax : 0, t.colorScheme) + ';"' : "";
         var data = v ? ' data-hm-row="' + ri + '" data-hm-month="' + m + '"' : "";
-        html += '<td class="' + cls + '"' + style + data + "></td>";
+        html += '<td class="' + cls + '"' + data + '><span class="cf-heatmap__pill"' + pillStyle + "></span></td>";
       });
       html += "</tr>";
     });
@@ -2131,6 +2219,7 @@
     var wrap = document.createElement("div");
     wrap.className = "cf-timeline-wrap";
     wrap.style.setProperty("--section-gap", cashflowSectionGapPx + "px");
+    applyTimelineSizing(wrap);
     wrap.innerHTML = html;
     section.appendChild(wrap);
 
@@ -2154,9 +2243,41 @@
         tooltip.style.top = ev.pageY - 46 + "px";
       });
       table.addEventListener("mouseleave", function () { tooltip.style.display = "none"; });
+
+      // Size controls only move CSS custom properties, so they update live
+      // without rebuilding the (potentially thousands of) cells.
+      [["tlLength", "cellLength", "tlLengthVal"], ["tlThickness", "cellThickness", "tlThicknessVal"], ["tlGap", "cellGap", "tlGapVal"]]
+        .forEach(function (spec) {
+          var input = section.querySelector("#" + spec[0]);
+          if (!input) return;
+          input.addEventListener("input", function () {
+            timelineSettings[spec[1]] = Number(input.value);
+            section.querySelector("#" + spec[2]).textContent = input.value + "px";
+            applyTimelineSizing(wrap);
+          });
+          input.addEventListener("change", function () { persist(); });
+        });
+      var basisSel = section.querySelector("#tlScaleBasis");
+      if (basisSel) basisSel.addEventListener("change", function () {
+        timelineSettings.scaleBasis = basisSel.value;
+        persist();
+        render();
+      });
+      var schemeSel = section.querySelector("#tlColorScheme");
+      if (schemeSel) schemeSel.addEventListener("change", function () {
+        timelineSettings.colorScheme = schemeSel.value;
+        persist();
+        render();
+      });
     }
 
     return section;
+  }
+
+  function renderTimelineTab(el) {
+    var summary = buildSummary(project);
+    if (summary.months.length === 0) { el.appendChild(emptyScheduleSection()); return; }
+    el.appendChild(buildCashflowTimelineSection(summary, false));
   }
 
   function emptyScheduleSection() {
