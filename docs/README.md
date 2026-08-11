@@ -2,7 +2,7 @@
 
 Two self-contained HTML pages live here — pick whichever backend you want:
 
-| | `index.html` | `apps-script-v0.2.html` |
+| | `index.html` | `apps-script-v0.3.html` |
 |---|---|---|
 | Backend | Google Sheets API directly | A Google Apps Script web app ([`apps-script/`](../apps-script/README.md)) |
 | Setup | Google Cloud OAuth Client ID | Paste your Apps Script's `/exec` URL — no Cloud Console |
@@ -12,7 +12,20 @@ Both have the same features (editable line items with even-spread or
 custom-date schedules, draws, cap table with auto-split, monthly summary),
 no build step, no npm install.
 
-## `apps-script-v0.2.html` — no Google Cloud setup
+## Versions
+
+`apps-script-v0.3.html` is the current version — the one to open and the
+only one still being changed. `apps-script-v0.2.html` and
+`apps-script-v0.1.html` are frozen snapshots kept for reference; they stay
+as they were and don't get new features.
+
+| Version | Adds |
+|---|---|
+| v0.3 | Cashflow Timeline — a per-row heatmap of the cashflow grid |
+| v0.2 | Budget tab, cashflow row/cell coloring, CSV import, Cap Table Detail |
+| v0.1 | Original cashflow + draws + cap table |
+
+## `apps-script-v0.3.html` — no Google Cloud setup
 
 Talks to a Google Apps Script web app over plain HTTP instead of calling
 Google Sheets directly, so there's no OAuth Client ID to create. Set up the
@@ -40,12 +53,12 @@ dropdown in the top bar.
 
 This repo's Pages source is **Settings → Pages → Build and deployment →
 Source: Deploy from a branch**, branch `main`, folder `/docs`. No CI run
-needed — live within a minute, and both `index.html` and `apps-script-v0.2.html`
-are served together (at `/` and `/apps-script-v0.2.html`) since they're just two
+needed — live within a minute, and both `index.html` and `apps-script-v0.3.html`
+are served together (at `/` and `/apps-script-v0.3.html`) since they're just two
 pages of the same static site, at `https://<your-username>.github.io/CF/`.
 
 A Pages site can only have **one** active source. If you instead want the
 `frontend/` React app live at this repo's Pages URL, see
 [the root README's Deploying section](../README.md#deploying) — switching
-to it means `index.html`/`apps-script-v0.2.html` stop being reachable via Pages
+to it means `index.html`/`apps-script-v0.3.html` stop being reachable via Pages
 until you switch back.
