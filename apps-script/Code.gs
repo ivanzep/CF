@@ -4,7 +4,7 @@
  * Bind this script to a Google Sheet (Extensions > Apps Script), deploy it
  * as a web app (Deploy > New deployment > Web app, access: Anyone), and
  * use the resulting /exec URL as the API endpoint for the static frontend
- * in docs/apps-script-v0.2.html (hosted separately, e.g. on GitHub Pages). All
+ * in docs/apps-script-v0.4.html (hosted separately, e.g. on GitHub Pages). All
  * data lives in tabs on the bound spreadsheet.
  *
  * Apps Script web app responses don't carry CORS headers, so a visiting
@@ -34,7 +34,7 @@
  */
 
 var TAB_SCHEMA = {
-  Project: ["id", "name", "client", "address", "description", "projectDate", "capTablePrefPercent", "capTableStartDate", "capTableEndDate", "printSettingsJson", "printSectionsJson", "printFitJson", "monthNotesJson", "timelineSettingsJson"],
+  Project: ["id", "name", "client", "address", "description", "projectDate", "capTablePrefPercent", "capTableStartDate", "capTableEndDate", "printSettingsJson", "printSectionsJson", "printFitJson", "monthNotesJson", "timelineSettingsJson", "printSectionOrderJson"],
   Categories: ["id", "name", "sortOrder"],
   LineItems: ["id", "categoryId", "code", "description", "totalBudget", "scheduleMode", "startDate", "endDate", "sortOrder", "color"],
   Payments: ["id", "lineItemId", "date", "amount"],
@@ -303,6 +303,7 @@ function getProject() {
     printFit: jsonOrNull_(projectRow[11]),
     monthNotes: jsonOrNull_(projectRow[12]) || {},
     timelineSettings: jsonOrNull_(projectRow[13]),
+    printSectionOrder: jsonOrNull_(projectRow[14]),
     categories: readTab_("Categories").map(function (row) {
       return { id: str_(row[0]), name: str_(row[1]), sortOrder: num_(row[2]) };
     }),
@@ -329,7 +330,7 @@ function saveProject(project) {
   writeTab_("Project", [[project.id, project.name || "", project.client || "", project.address || "", project.description || "", project.projectDate || "",
     capSettings.prefPercent || 0, capSettings.startDate || "", capSettings.endDate || "",
     JSON.stringify(project.printSettings || {}), JSON.stringify(project.printSections || {}), JSON.stringify(project.printFit || {}), JSON.stringify(project.monthNotes || {}),
-    JSON.stringify(project.timelineSettings || {})]]);
+    JSON.stringify(project.timelineSettings || {}), JSON.stringify(project.printSectionOrder || [])]]);
   writeTab_("Categories", project.categories.map(function (c) { return [c.id, c.name, c.sortOrder]; }));
   writeTab_("LineItems", project.lineItems.map(function (li) {
     return [li.id, li.categoryId || "", li.code || "", li.description, li.totalBudget, li.scheduleMode, li.startDate || "", li.endDate || "", li.sortOrder, li.color || ""];
