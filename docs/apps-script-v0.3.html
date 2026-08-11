@@ -259,6 +259,13 @@
   .cf-timeline__legend-step { width: 16px; height: 10px; border: 1px solid var(--border); border-left: none; }
   .cf-timeline__legend-step:first-child { border-left: 1px solid var(--border); }
   .cf-timeline__hint { font-size: 11px; color: var(--text-muted); margin: 0 0 10px; }
+  .budget-mismatch {
+    display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 10px;
+    font-size: 10.5px; white-space: nowrap; cursor: help;
+    color: #8a4b00; background: rgba(214, 138, 10, 0.14); border: 1px solid rgba(214, 138, 10, 0.4);
+  }
+  :root[data-theme="dark"] .budget-mismatch { color: #f0b45c; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .budget-mismatch { color: #f0b45c; } }
   .cf-timeline-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 20px; margin: 10px 0; font-size: 12px; color: var(--text-secondary); }
   .cf-timeline-controls label { display: flex; align-items: center; gap: 6px; }
   .cf-timeline-controls__range input[type="range"] { width: 96px; accent-color: var(--accent); }
@@ -354,6 +361,15 @@
   .print-preview-mode .app-topbar, .print-preview-mode .tabs, .print-preview-mode .signed-in-bar { display: none !important; }
   .print-preview-mode .app, .print-preview-mode .section { max-width: none; }
   .print-preview-mode .summary-grid-wrap { overflow: visible !important; max-height: none !important; border: none; }
+  /* The on-screen wrap scrolls and is capped at 70vh / 100% width; leaving that in
+     place for print both clips the chart and makes applyFitScaling measure the
+     clipped box instead of the table's natural size. */
+  .print-preview-mode .cf-timeline-wrap {
+    overflow: visible !important; max-height: none !important;
+    width: auto !important; max-width: none !important; border: none;
+  }
+  .print-preview-mode .cf-timeline { border: none; box-shadow: none; padding: 0; }
+  .print-preview-mode .cf-heatmap thead th, .print-preview-mode .cf-heatmap__label { position: static !important; box-shadow: none !important; }
   .print-preview-mode .summary-grid th, .print-preview-mode .summary-grid__label, .print-preview-mode .summary-grid__budget { position: static !important; box-shadow: none !important; }
   .print-preview-mode .summary-grid th, .print-preview-mode .summary-grid td { padding-top: var(--print-row-padding, 5px); padding-bottom: var(--print-row-padding, 5px); }
   .print-preview-mode .cashflow-chart, .print-preview-mode .summary-grid-wrap, .print-preview-mode .draws-summary { border: none; box-shadow: none; }
@@ -401,6 +417,12 @@
     .print-page__viewport { position: static !important; overflow: visible !important; margin: 0 !important; width: 100% !important; height: 100% !important; }
     .print-page__label { display: none !important; }
     .summary-grid-wrap { overflow: visible !important; max-height: none !important; border: none; }
+    .cf-timeline-wrap {
+      overflow: visible !important; max-height: none !important;
+      width: auto !important; max-width: none !important; border: none;
+    }
+    .cf-timeline { border: none; box-shadow: none; padding: 0; }
+    .cf-heatmap thead th, .cf-heatmap__label { position: static !important; box-shadow: none !important; }
     .summary-grid th, .summary-grid__label, .summary-grid__budget { position: static !important; box-shadow: none !important; }
     .summary-grid th, .summary-grid td { padding-top: var(--print-row-padding, 5px); padding-bottom: var(--print-row-padding, 5px); }
     .cashflow-chart, .summary-grid-wrap, .draws-summary { border: none; box-shadow: none; }
@@ -622,8 +644,8 @@
   var chartCollapsed = true;
   var projectHeaderCollapsed = true;
   var timelineSettings = {
-    cellLength: 22, cellThickness: 12, cellGap: 4,
-    scaleBasis: "line", colorScheme: "accent",
+    cellLength: 22, cellThickness: 12, cellGap: 4, sectionGap: 8,
+    scaleBasis: "line", colorScheme: "accent", sensitivity: 2,
   };
   var highlightCurrentMonth = true;
   var cashflowFullWidth = false;
@@ -641,7 +663,9 @@
     pageBreakPerSection: true, logoUrl: "",
   };
   var printSections = { cashflowGraph: true, cashflowTable: true, cashflowTimeline: true, yearly: true, drawReport: true, capTable: true, drawsList: true };
-  var printFit = { cashflowGraph: "none", cashflowTable: "none", cashflowTimeline: "none", yearly: "none", drawReport: "none", capTable: "none", drawsList: "none" };
+  // The timeline is as wide as the project is long, so it essentially always needs
+  // shrinking to fit a page — unlike the other sections, "width" is the useful default.
+  var printFit = { cashflowGraph: "none", cashflowTable: "none", cashflowTimeline: "width", yearly: "none", drawReport: "none", capTable: "none", drawsList: "none" };
   var nextIdCounter = 1;
 
   function genId(prefix) { return prefix + "_" + (nextIdCounter++) + "_" + Math.random().toString(36).slice(2, 7); }
@@ -2055,9 +2079,12 @@
     magma: { label: "Purple → Orange → Yellow", stops: [[87, 37, 133], [222, 91, 60], [252, 203, 70]] },
   };
 
-  function heatFill(t, scheme) {
+  // `sensitivity` bends the ramp with a power curve: 1 is linear, higher values pull
+  // low fractions upward so the many small months spread across the ramp instead of
+  // bunching at the pale end while one peak takes everything above it.
+  function heatFill(t, scheme, sensitivity) {
     if (!(t > 0)) return "transparent";
-    t = Math.min(1, t);
+    t = Math.pow(Math.min(1, t), 1 / (sensitivity || 1));
     var s = TIMELINE_SCHEMES[scheme] || TIMELINE_SCHEMES.accent;
     // Single-hue: keep a visible floor so small non-zero months don't vanish.
     if (!s.stops) return "color-mix(in srgb, var(--accent) " + Math.round(12 + 88 * t) + "%, transparent)";
@@ -2074,6 +2101,7 @@
     el.style.setProperty("--pill-w", timelineSettings.cellLength + "px");
     el.style.setProperty("--pill-h", timelineSettings.cellThickness + "px");
     el.style.setProperty("--pill-gap", timelineSettings.cellGap + "px");
+    el.style.setProperty("--section-gap", timelineSettings.sectionGap + "px");
   }
 
   function timelineRowsFor(summary) {
@@ -2122,7 +2150,7 @@
     var legendHtml = '<span class="cf-timeline__legend">low' +
       '<span class="cf-timeline__legend-scale">' +
       [0.02, 0.25, 0.5, 0.75, 1].map(function (f) {
-        return '<span class="cf-timeline__legend-step" style="background:' + heatFill(f, t.colorScheme) + ';"></span>';
+        return '<span class="cf-timeline__legend-step" style="background:' + heatFill(f, t.colorScheme, t.sensitivity) + ';"></span>';
       }).join("") +
       "</span>high</span>";
 
@@ -2161,7 +2189,13 @@
           '<span id="tlThicknessVal">' + t.cellThickness + "px</span></label>" +
         '<label class="cf-timeline-controls__range">Separation' +
           '<input type="range" id="tlGap" min="0" max="20" step="1" value="' + t.cellGap + '" />' +
-          '<span id="tlGapVal">' + t.cellGap + "px</span></label>";
+          '<span id="tlGapVal">' + t.cellGap + "px</span></label>" +
+        '<label class="cf-timeline-controls__range">Section gap' +
+          '<input type="range" id="tlSectionGap" min="0" max="40" step="1" value="' + t.sectionGap + '" />' +
+          '<span id="tlSectionGapVal">' + t.sectionGap + "px</span></label>" +
+        '<label class="cf-timeline-controls__range">Sensitivity' +
+          '<input type="range" id="tlSensitivity" min="1" max="5" step="0.1" value="' + t.sensitivity + '" />' +
+          '<span id="tlSensitivityVal">' + t.sensitivity + "×</span></label>";
       section.appendChild(controls);
     }
 
@@ -2208,7 +2242,7 @@
         var v = row.monthly[m] || 0;
         var cls = "cf-heatmap__cell" + (v ? "" : " cf-heatmap__cell--empty") +
           (highlightCurrentMonth && m === thisMonth ? " cf-heatmap__current" : "");
-        var pillStyle = v ? ' style="background:' + heatFill(rowMax > 0 ? Math.abs(v) / rowMax : 0, t.colorScheme) + ';"' : "";
+        var pillStyle = v ? ' style="background:' + heatFill(rowMax > 0 ? Math.abs(v) / rowMax : 0, t.colorScheme, t.sensitivity) + ';"' : "";
         var data = v ? ' data-hm-row="' + ri + '" data-hm-month="' + m + '"' : "";
         html += '<td class="' + cls + '"' + data + '><span class="cf-heatmap__pill"' + pillStyle + "></span></td>";
       });
@@ -2218,7 +2252,6 @@
 
     var wrap = document.createElement("div");
     wrap.className = "cf-timeline-wrap";
-    wrap.style.setProperty("--section-gap", cashflowSectionGapPx + "px");
     applyTimelineSizing(wrap);
     wrap.innerHTML = html;
     section.appendChild(wrap);
@@ -2246,7 +2279,8 @@
 
       // Size controls only move CSS custom properties, so they update live
       // without rebuilding the (potentially thousands of) cells.
-      [["tlLength", "cellLength", "tlLengthVal"], ["tlThickness", "cellThickness", "tlThicknessVal"], ["tlGap", "cellGap", "tlGapVal"]]
+      [["tlLength", "cellLength", "tlLengthVal"], ["tlThickness", "cellThickness", "tlThicknessVal"],
+       ["tlGap", "cellGap", "tlGapVal"], ["tlSectionGap", "sectionGap", "tlSectionGapVal"]]
         .forEach(function (spec) {
           var input = section.querySelector("#" + spec[0]);
           if (!input) return;
@@ -2257,6 +2291,18 @@
           });
           input.addEventListener("change", function () { persist(); });
         });
+      // Sensitivity changes every pill's color, so it does need a rebuild.
+      var sensInput = section.querySelector("#tlSensitivity");
+      if (sensInput) {
+        sensInput.addEventListener("input", function () {
+          section.querySelector("#tlSensitivityVal").textContent = sensInput.value + "×";
+        });
+        sensInput.addEventListener("change", function () {
+          timelineSettings.sensitivity = Number(sensInput.value);
+          persist();
+          render();
+        });
+      }
       var basisSel = section.querySelector("#tlScaleBasis");
       if (basisSel) basisSel.addEventListener("change", function () {
         timelineSettings.scaleBasis = basisSel.value;
@@ -2534,11 +2580,26 @@
     wireLineItemEvents(el);
   }
 
+  // Custom payments are entered independently of totalBudget, so the two can drift
+  // apart silently — the grid shows totalBudget in the Budget column but sums the
+  // payments into the monthly cells. Returns null when they agree (or can't be compared).
+  function scheduleBudgetMismatch(li) {
+    if (li.scheduleMode !== "CUSTOM") return null;
+    if (linkedBudgetItemsFor(li).length > 0) return null;
+    var payments = getLineItemSchedule(li);
+    if (!payments.length) return null;
+    var scheduled = round2(sum(payments.map(function (p) { return p.amount; })));
+    var budget = round2(li.totalBudget || 0);
+    if (Math.abs(scheduled - budget) < 0.01) return null;
+    return { scheduled: scheduled, budget: budget, delta: round2(scheduled - budget) };
+  }
+
   function lineItemRowHtml(li) {
     var linked = linkedBudgetItemsFor(li);
     var isOverridden = linked.length > 0;
     var effectiveBudget = effectiveLineItemBudget(li);
     var schedule = getLineItemSchedule(li);
+    var mismatch = scheduleBudgetMismatch(li);
     var summary = li.scheduleMode === "EVEN"
       ? (li.startDate && li.endDate ? "Even, " + li.startDate + " → " + li.endDate : "Even (set dates)")
       : schedule.length + " custom payment" + (schedule.length === 1 ? "" : "s");
@@ -2551,7 +2612,13 @@
       : '<td class="col-money"><span class="money-input"><input type="number" class="editable-number" value="' + li.totalBudget + '" data-item-field="totalBudget" data-item-id="' + li.id + '" /></span></td>';
     var scheduleCell = isOverridden
       ? '<td class="col-schedule"><span class="schedule-editor__hint">Set on Budget tab' + linkedNote + "</span></td>"
-      : '<td class="col-schedule"><button class="link-button" data-toggle-schedule="' + li.id + '">' + (expandedLineItemId === li.id ? "▾ " : "▸ ") + esc(summary) + "</button></td>";
+      : '<td class="col-schedule"><button class="link-button" data-toggle-schedule="' + li.id + '">' + (expandedLineItemId === li.id ? "▾ " : "▸ ") + esc(summary) + "</button>" +
+        (mismatch
+          ? '<span class="budget-mismatch" title="The custom payments on this line add up to ' + fmtMoney(mismatch.scheduled, true) +
+            ", but its budget is " + fmtMoney(mismatch.budget, true) + '. The cashflow grid charts the payments, not the budget.">⚠ payments ' +
+            fmtMoney(mismatch.scheduled) + " ≠ budget " + fmtMoney(mismatch.budget) +
+            " (" + (mismatch.delta > 0 ? "+" : "") + fmtMoney(mismatch.delta) + ")</span>"
+          : "") + "</td>";
     var rows = '<tr data-item-row="' + li.id + '">' +
       '<td class="col-code"><input class="editable-text" value="' + esc(li.code || "") + '" data-item-field="code" data-item-id="' + li.id + '" /></td>' +
       '<td><input class="editable-text" value="' + esc(li.description) + '" data-item-field="description" data-item-id="' + li.id + '" /></td>' +
