@@ -483,7 +483,26 @@
   }
   .print-preview-bar button:hover { background: var(--page); border-color: var(--accent); }
   .print-preview-bar__label { color: var(--text-primary); }
-  .print-preview-mode { background: #fff; font-size: calc(1em * var(--print-font-scale, 1)); }
+  /* Printed output is always the light palette, regardless of the app's current
+     data-theme — printing dark-theme colors (white text, near-black borders meant
+     for a dark backdrop) onto white paper reads as broken, not "dark mode paper".
+     Setting these custom properties directly on the body.print-preview-mode element
+     overrides whatever :root[data-theme] supplied, since inheritance is resolved from
+     the nearest ancestor that redeclares a property — every descendant (including the
+     exportPdf() reader, which walks this same live DOM) sees the light values. */
+  .print-preview-mode {
+    background: #fff; font-size: calc(1em * var(--print-font-scale, 1));
+    /* --accent/--accent-bg/--actual/--actual-bg are deliberately NOT reset here: those
+       can be a user-chosen custom color (an inline style on <html>, independent of
+       data-theme) which should still come through in print, so only the properties
+       that genuinely flip between the light/dark theme presets are forced back. */
+    --surface: #ffffff; --page: #ffffff;
+    --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #898781;
+    --border: #e1e0d9; --border-strong: #c3c2b7;
+    --danger: #e34948; --good: #0ca30c;
+    --banner: #fdf6e3; --banner-border: #eadfb4; --banner-text: #6b5b1e;
+    --year-shade: rgba(0, 0, 0, 0.035);
+  }
   .print-preview-mode.print-grayscale .print-pages { filter: grayscale(1); }
   .print-preview-mode .app-topbar, .print-preview-mode .tabs, .print-preview-mode .signed-in-bar { display: none !important; }
   .print-preview-mode .app, .print-preview-mode .section { max-width: none; }
@@ -498,7 +517,11 @@
   .print-preview-mode .cf-timeline { border: none; box-shadow: none; padding: 0; }
   .print-preview-mode .cf-heatmap thead th, .print-preview-mode .cf-heatmap__label { position: static !important; box-shadow: none !important; }
   .print-preview-mode .summary-grid th, .print-preview-mode .summary-grid__label, .print-preview-mode .summary-grid__budget { position: static !important; box-shadow: none !important; }
-  .print-preview-mode .summary-grid th, .print-preview-mode .summary-grid td { padding-top: var(--print-row-padding, 5px); padding-bottom: var(--print-row-padding, 5px); }
+  /* Full padding shorthand (not just top/bottom): the base rule sets horizontal
+     padding via calc(10px * var(--cf-zoom)), and the on-screen Cashflow tab's zoom
+     level has nothing to do with print — resetting only the vertical sides left
+     zoomed horizontal padding leaking into print/PDF column widths and margins. */
+  .print-preview-mode .summary-grid th, .print-preview-mode .summary-grid td { padding: var(--print-row-padding, 5px) 10px; }
   .print-preview-mode .cashflow-chart, .print-preview-mode .summary-grid-wrap, .print-preview-mode .draws-summary { border: none; box-shadow: none; }
   .print-preview-mode tr { page-break-inside: avoid; }
   .print-preview-mode .print-real-content { display: none !important; }
@@ -515,7 +538,19 @@
 
   @media print {
     @page { size: landscape; margin: 12mm; }
-    body { background: #fff; font-size: calc(1em * var(--print-font-scale, 1)); }
+    /* Same rationale as .print-preview-mode above: force the light palette on paper
+       regardless of data-theme. Real printing renders .print-preview-mode's DOM too
+       (see buildPrintPages), so this is a belt-and-suspenders match for anyone who
+       triggers the browser's native print dialog directly. */
+    body {
+      background: #fff; font-size: calc(1em * var(--print-font-scale, 1));
+      --surface: #ffffff; --page: #ffffff;
+      --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #898781;
+      --border: #e1e0d9; --border-strong: #c3c2b7;
+      --danger: #e34948; --good: #0ca30c;
+      --banner: #fdf6e3; --banner-border: #eadfb4; --banner-text: #6b5b1e;
+      --year-shade: rgba(0, 0, 0, 0.035);
+    }
     body.print-grayscale { filter: grayscale(1); }
     button, select, .tabs, .app-topbar, .signed-in-bar, .print-preview-bar, .project-header { display: none !important; }
     .app, .section { max-width: none; padding: 0 !important; margin: 0 !important; }
@@ -540,7 +575,7 @@
        content independently of the .print-page-outer break-after boundaries, producing
        phantom extra pages. Real print no longer needs the positioning/clipping at all
        since each page's content is already sized to fit, so fall back to plain flow. */
-    .print-page { position: static !important; transform: none !important; box-shadow: none !important; width: 100% !important; height: 100% !important; }
+    .print-page { position: static !important; transform: none !important; box-shadow: none !important; border: none !important; width: 100% !important; height: 100% !important; }
     .print-page__viewport { position: static !important; overflow: visible !important; margin: 0 !important; width: 100% !important; height: 100% !important; }
     .print-page__label { display: none !important; }
     .summary-grid-wrap { overflow: visible !important; max-height: none !important; border: none; }
@@ -551,7 +586,7 @@
     .cf-timeline { border: none; box-shadow: none; padding: 0; }
     .cf-heatmap thead th, .cf-heatmap__label { position: static !important; box-shadow: none !important; }
     .summary-grid th, .summary-grid__label, .summary-grid__budget { position: static !important; box-shadow: none !important; }
-    .summary-grid th, .summary-grid td { padding-top: var(--print-row-padding, 5px); padding-bottom: var(--print-row-padding, 5px); }
+    .summary-grid th, .summary-grid td { padding: var(--print-row-padding, 5px) 10px; }
     .cashflow-chart, .summary-grid-wrap, .draws-summary { border: none; box-shadow: none; }
     tr { page-break-inside: avoid; }
     .summary-grid { font-size: calc(12.5px * var(--print-font-scale, 1)); }
@@ -574,7 +609,11 @@
   .print-pages__zoom span { min-width: 40px; text-align: center; font-variant-numeric: tabular-nums; }
   .print-pages__pages { display: flex; flex-direction: column; align-items: safe center; gap: 24px; transform-origin: top center; overflow-x: auto; padding: 0 4px; }
   .print-page-outer { position: relative; flex-shrink: 0; overflow: hidden; }
-  .print-page { background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.18); position: absolute; top: 0; left: 0; }
+  /* border, not just the box-shadow: the shadow is offset down-right, so on a light
+     backdrop (--page is white, same as the page itself, since v0.5's flat theme) the
+     top/left edges of the sheet had no visible boundary at all — only a border draws
+     all four edges regardless of backdrop color. */
+  .print-page { background: #fff; border: 1px solid var(--border-strong); box-shadow: 0 4px 20px rgba(0,0,0,0.18); position: absolute; top: 0; left: 0; }
   .print-page__viewport { overflow: hidden; position: relative; }
   .print-page__content { position: relative; }
   .print-page__label { position: absolute; bottom: 4px; right: 8px; font-size: 10px; color: var(--text-muted); }
@@ -3170,20 +3209,33 @@
         pdfRectPath(toX(x), toY(y), toX(w), toY(0) - toY(h), radius ? toX(radius) : 0) + " f Q");
     }
 
-    function drawText(str, rect, size, bold, colour) {
+    function drawText(str, rect, size, bold, colour, align) {
       var encoded = pdfEncodeText(str);
       if (!encoded.trim()) return;
       var natural = pdfTextWidth(encoded, size, bold);
       if (natural <= 0) return;
-      // Match the on-screen run width exactly, so right-aligned figures stay aligned
-      // even though Helvetica's metrics differ from the browser's UI font.
-      var scale = rect.width > 0 ? Math.max(50, Math.min(200, (rect.width / natural) * 100)) : 100;
+      // Anchor by the run's own natural (Helvetica) width instead of horizontally
+      // scaling glyphs to force-match the on-screen pixel width — Tz-stretching every
+      // run to fit its box visibly warps the letterforms (condensed as low as 50%,
+      // expanded up to 200%) since Helvetica's metrics differ from the browser's UI
+      // font. Anchoring by alignment keeps glyphs undistorted; a right-aligned column
+      // of figures may land a point or two off from the on-screen edge, which reads
+      // far better than stretched/squished text.
+      var left = rect.left - origin.left;
+      var x = left;
+      if (align === "right") x = left + rect.width - natural;
+      else if (align === "center") x = left + (rect.width - natural) / 2;
       var ascent = 0.718 * size, descent = 0.207 * size;
       var baseline = rect.top - origin.top + (rect.height - (ascent + descent)) / 2 + ascent;
       ops.push("BT " + pdfRgb(colour) + " /" + (bold ? "F2" : "F1") + " " + pdfNum(size * PDF_PT_PER_PX) + " Tf " +
-        pdfNum(scale) + " Tz " +
-        pdfNum(toX(rect.left - origin.left)) + " " + pdfNum(toY(baseline)) + " Td (" +
+        pdfNum(toX(x)) + " " + pdfNum(toY(baseline)) + " Td (" +
         pdfEscapeString(encoded) + ") Tj ET");
+    }
+
+    function pdfAlignOf(textAlign) {
+      if (textAlign === "right" || textAlign === "end") return "right";
+      if (textAlign === "center") return "center";
+      return "left";
     }
 
     function emitTextNodes(el, cs) {
@@ -3191,6 +3243,7 @@
       var bold = (parseInt(cs.fontWeight, 10) || 400) >= 600;
       var isSvg = el.namespaceURI === "http://www.w3.org/2000/svg";
       var colour = pdfParseColor(isSvg ? cs.fill : cs.color) || { r: 0, g: 0, b: 0, a: 1 };
+      var align = pdfAlignOf(cs.textAlign);
       Array.prototype.forEach.call(el.childNodes, function (node) {
         if (node.nodeType !== 3) return;
         var text = node.nodeValue.replace(/\s+/g, " ");
@@ -3200,7 +3253,7 @@
         var rects = Array.prototype.slice.call(range.getClientRects())
           .filter(function (r) { return r.width > 0.5 && r.height > 0.5; });
         if (rects.length === 0) return;
-        if (rects.length === 1) { drawText(text, rects[0], size, bold, colour); return; }
+        if (rects.length === 1) { drawText(text, rects[0], size, bold, colour, align); return; }
         // Wrapped run: hand words to each line box until it is full.
         var words = text.trim().split(" ");
         var w = 0;
@@ -3213,7 +3266,7 @@
             line.push(words[w++]);
             used = candidate;
           }
-          if (line.length) drawText(line.join(" "), r, size, bold, colour);
+          if (line.length) drawText(line.join(" "), r, size, bold, colour, align);
         });
       });
     }
