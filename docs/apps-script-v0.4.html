@@ -352,7 +352,37 @@
     border-bottom: 1px solid var(--border-strong); box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     padding: 10px 24px;
   }
-  #ppSettingsPanel { display: flex; flex-direction: column; gap: 8px; }
+  /* Settings live in a drawer pinned to the right edge. position:fixed works from
+     inside the sticky bar because the bar creates no containing block for it, and
+     keeping it out of flow means the bar's own height stays just the action row. */
+  #ppSettingsPanel {
+    position: fixed; right: 0; bottom: 0; z-index: 101;
+    width: min(374px, 92vw); display: flex; flex-direction: column; gap: 8px;
+    padding: 0 12px 14px; overflow-y: auto; overscroll-behavior: contain;
+    background: var(--surface); border-left: 1px solid var(--border-strong);
+    box-shadow: -6px 0 18px rgba(0,0,0,0.08);
+    transition: transform 0.18s ease;
+  }
+  body.pp-panel-closed #ppSettingsPanel { transform: translateX(100%); }
+  .pp-panel-head {
+    position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px;
+    margin: 0 -12px 4px; padding: 9px 12px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  .pp-panel-head__title { flex: 1; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); }
+  .pp-panel-head__close { width: 24px; height: 24px; padding: 0 !important; display: flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1; }
+  /* One column in a narrow drawer; the sections group no longer needs to span. */
+  #ppSettingsPanel .pp-groups { grid-template-columns: 1fr; }
+  #ppSettingsPanel .pp-group--sections { grid-column: auto; }
+  #ppSettingsPanel .pp-section-row { gap: 6px; }
+  /* Keep every row one line tall; ellipsis is the fallback if a label ever outgrows it. */
+  #ppSettingsPanel .pp-section-row__name { white-space: nowrap; overflow: hidden; }
+  #ppSettingsPanel .pp-section-row__name > :last-child { overflow: hidden; text-overflow: ellipsis; }
+  #ppSettingsPanel .pp-section-row select { min-width: 84px; }
+  /* Keep the pages clear of the drawer instead of scrolling underneath it. */
+  @media (min-width: 760px) {
+    body.pp-panel-open .print-pages { padding-right: min(374px, 92vw); }
+  }
   .print-preview-bar__row { display: flex; align-items: center; gap: 12px; }
   .print-preview-bar__label { font-weight: 600; flex: 1; }
 
@@ -571,6 +601,10 @@
       <button id="ppExitBtn" type="button">Exit preview</button>
     </div>
     <div id="ppSettingsPanel">
+      <div class="pp-panel-head">
+        <span class="pp-panel-head__title">Print settings</span>
+        <button type="button" class="pp-panel-head__close" id="ppPanelCloseBtn" aria-label="Close settings">×</button>
+      </div>
       <div class="pp-groups">
         <div class="pp-group">
           <div class="pp-group__title"><button type="button" class="pp-group__toggle" data-pp-group="page">▾</button>Page</div>
@@ -1220,8 +1254,14 @@
   // 100% the sheet ran off-screen and looked like fit-to-width had failed. Track the
   // zoom automatically until the user takes manual control of it.
   var printZoomAuto = true;
+  function printPanelWidth() {
+    if (!previewMode || printSettingsPanelCollapsed || window.innerWidth < 760) return 0;
+    var panel = document.getElementById("ppSettingsPanel");
+    return panel ? panel.offsetWidth : 0;
+  }
   function fitZoomPercentFor(dims) {
-    return Math.max(25, Math.min(100, Math.floor(((window.innerWidth - 64) / dims.pageWidthPx) * 100)));
+    var available = window.innerWidth - printPanelWidth() - 64;
+    return Math.max(25, Math.min(100, Math.floor((available / dims.pageWidthPx) * 100)));
   }
 
   function marginsIn(settings) {
@@ -4013,8 +4053,15 @@
       " }";
   }
   function updateSettingsPanelToggle() {
-    document.getElementById("ppSettingsPanel").style.display = printSettingsPanelCollapsed ? "none" : "flex";
-    document.getElementById("ppSettingsToggleBtn").textContent = (printSettingsPanelCollapsed ? "▸" : "▾") + " Settings";
+    var panel = document.getElementById("ppSettingsPanel");
+    var bar = document.getElementById("printPreviewBar");
+    // The drawer is fixed, so it needs the bar's height as its top offset; reading it
+    // each time keeps it correct if the bar ever wraps to two rows.
+    panel.style.top = Math.round(bar.getBoundingClientRect().height) + "px";
+    document.body.classList.toggle("pp-panel-open", previewMode && !printSettingsPanelCollapsed);
+    document.body.classList.toggle("pp-panel-closed", printSettingsPanelCollapsed);
+    document.getElementById("ppSettingsToggleBtn").textContent =
+      (printSettingsPanelCollapsed ? "‹" : "›") + " Settings";
   }
   function syncPrintPanelFromState() {
     document.getElementById("ppPageSize").value = printSettings.pageSize;
@@ -4104,7 +4151,11 @@
     if (on) printGeneratedAt = new Date();
     document.body.classList.toggle("print-preview-mode", on);
     document.getElementById("printPreviewBar").style.display = on ? "flex" : "none";
-    if (on) { syncPrintPanelFromState(); applyPrintSettingsToDom(); updateSettingsPanelToggle(); }
+    if (on) { syncPrintPanelFromState(); applyPrintSettingsToDom(); }
+    // Runs on exit too, so the drawer's body classes (and the page padding they add)
+    // don't linger once the preview is closed. Before render() so the auto-fit zoom
+    // measures against the width the drawer actually leaves free.
+    updateSettingsPanelToggle();
     render();
   }
   document.getElementById("printBtn").addEventListener("click", function () {
@@ -4116,9 +4167,18 @@
   document.getElementById("ppPrintBtn").addEventListener("click", function () {
     window.print();
   });
-  document.getElementById("ppSettingsToggleBtn").addEventListener("click", function () {
-    printSettingsPanelCollapsed = !printSettingsPanelCollapsed;
+  function togglePrintSettingsPanel(collapsed) {
+    printSettingsPanelCollapsed = collapsed;
     updateSettingsPanelToggle();
+    // Opening or closing changes the width left for the pages, so an auto-fit zoom
+    // needs recomputing.
+    if (previewMode) render();
+  }
+  document.getElementById("ppSettingsToggleBtn").addEventListener("click", function () {
+    togglePrintSettingsPanel(!printSettingsPanelCollapsed);
+  });
+  document.getElementById("ppPanelCloseBtn").addEventListener("click", function () {
+    togglePrintSettingsPanel(true);
   });
   document.getElementById("ppPageSize").addEventListener("change", function (e) {
     printSettings.pageSize = e.target.value;
