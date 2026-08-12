@@ -79,12 +79,29 @@
   :root[data-theme="dark"][data-accent="orange"] { --accent: #e08a2b; --accent-bg: rgba(224, 138, 43, 0.15); }
   :root[data-theme="dark"][data-accent="rose"] { --accent: #e35a8c; --accent-bg: rgba(227, 90, 140, 0.15); }
   :root[data-theme="dark"][data-accent="black"] { --accent: #e5e5e5; --accent-bg: rgba(229, 229, 229, 0.15); }
+
+  /* Actuals accent alternatives — independent of the general accent color above. */
+  :root[data-actual-accent="green"] { --actual: #2e9e5b; --actual-bg: rgba(46, 158, 91, 0.1); }
+  :root[data-actual-accent="blue"] { --actual: #2a78d6; --actual-bg: rgba(42, 120, 214, 0.1); }
+  :root[data-actual-accent="purple"] { --actual: #7c5cff; --actual-bg: rgba(124, 92, 255, 0.1); }
+  :root[data-actual-accent="amber"] { --actual: #c8720a; --actual-bg: rgba(200, 114, 10, 0.1); }
+  :root[data-actual-accent="rose"] { --actual: #c23b6b; --actual-bg: rgba(194, 59, 107, 0.1); }
+  :root[data-theme="dark"][data-actual-accent="green"] { --actual: #3fc178; --actual-bg: rgba(63, 193, 120, 0.15); }
+  :root[data-theme="dark"][data-actual-accent="blue"] { --actual: #3987e5; --actual-bg: rgba(57, 135, 229, 0.15); }
+  :root[data-theme="dark"][data-actual-accent="purple"] { --actual: #9277ff; --actual-bg: rgba(146, 119, 255, 0.15); }
+  :root[data-theme="dark"][data-actual-accent="amber"] { --actual: #e08a2b; --actual-bg: rgba(224, 138, 43, 0.15); }
+  :root[data-theme="dark"][data-actual-accent="rose"] { --actual: #e35a8c; --actual-bg: rgba(227, 90, 140, 0.15); }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"])[data-accent="green"] { --accent: #3fc178; --accent-bg: rgba(63, 193, 120, 0.15); }
     :root:not([data-theme="light"])[data-accent="purple"] { --accent: #9277ff; --accent-bg: rgba(146, 119, 255, 0.15); }
     :root:not([data-theme="light"])[data-accent="orange"] { --accent: #e08a2b; --accent-bg: rgba(224, 138, 43, 0.15); }
     :root:not([data-theme="light"])[data-accent="rose"] { --accent: #e35a8c; --accent-bg: rgba(227, 90, 140, 0.15); }
     :root:not([data-theme="light"])[data-accent="black"] { --accent: #e5e5e5; --accent-bg: rgba(229, 229, 229, 0.15); }
+    :root:not([data-theme="light"])[data-actual-accent="green"] { --actual: #3fc178; --actual-bg: rgba(63, 193, 120, 0.15); }
+    :root:not([data-theme="light"])[data-actual-accent="blue"] { --actual: #3987e5; --actual-bg: rgba(57, 135, 229, 0.15); }
+    :root:not([data-theme="light"])[data-actual-accent="purple"] { --actual: #9277ff; --actual-bg: rgba(146, 119, 255, 0.15); }
+    :root:not([data-theme="light"])[data-actual-accent="amber"] { --actual: #e08a2b; --actual-bg: rgba(224, 138, 43, 0.15); }
+    :root:not([data-theme="light"])[data-actual-accent="rose"] { --actual: #e35a8c; --actual-bg: rgba(227, 90, 140, 0.15); }
   }
 
   * { box-sizing: border-box; }
@@ -608,6 +625,8 @@
   .theme-picker__swatch--orange { background: #c8720a; }
   .theme-picker__swatch--rose { background: #c23b6b; }
   .theme-picker__swatch--black { background: #1a1a1a; }
+  .theme-picker__swatch--teal { background: #0a8f6b; }
+  .theme-picker__swatch--amber { background: #c8720a; }
 </style>
 <script>
   (function () {
@@ -615,6 +634,8 @@
     if (storedMode && storedMode !== "system") document.documentElement.setAttribute("data-theme", storedMode);
     var storedAccent = localStorage.getItem("cf-theme-accent");
     if (storedAccent) document.documentElement.setAttribute("data-accent", storedAccent);
+    var storedActualAccent = localStorage.getItem("cf-theme-actual-accent");
+    if (storedActualAccent) document.documentElement.setAttribute("data-actual-accent", storedActualAccent);
   })();
 </script>
 </head>
@@ -767,13 +788,17 @@
   var expandedMemberId = null;
   var chartCollapsed = true;
   var projectHeaderCollapsed = true;
+  // amountMode: "budget" (default), "actual" (hide budget, show only actuals as the
+  // primary pill row), or "both" (budget row plus a thin actual sub-row underneath).
   var timelineSettings = {
     cellLength: 22, cellThickness: 12, cellGap: 4, sectionGap: 8,
-    scaleBasis: "line", colorScheme: "accent", sensitivity: 2, showActuals: false,
+    scaleBasis: "line", colorScheme: "accent", sensitivity: 2, amountMode: "budget",
   };
   var highlightCurrentMonth = true;
   var cashflowFullWidth = false;
-  var cashflowShowActuals = false;
+  // "budget" (default), "actual" (hide budget, show only actuals), or "both" (budget row
+  // plus a muted actual sub-row underneath).
+  var cashflowAmountMode = "budget";
   var cashflowSectionGapPx = 0;
   var cfColorMenuState = null;
   var monthNotes = {};
@@ -970,7 +995,13 @@
     if (project.printSections) printSections = Object.assign({}, printSections, project.printSections);
     if (project.printFit) printFit = Object.assign({}, printFit, project.printFit);
     printSectionOrder = normalizedSectionOrder(project.printSectionOrder);
-    if (project.timelineSettings) timelineSettings = Object.assign({}, timelineSettings, project.timelineSettings);
+    if (project.timelineSettings) {
+      timelineSettings = Object.assign({}, timelineSettings, project.timelineSettings);
+      // Migrate the old boolean (pre-amountMode saves) into the new three-way setting.
+      if (project.timelineSettings.amountMode === undefined && project.timelineSettings.showActuals !== undefined) {
+        timelineSettings.amountMode = project.timelineSettings.showActuals ? "both" : "budget";
+      }
+    }
     monthNotes = project.monthNotes || {};
     monthNotesLoadedForId = project.id;
     isDirty = false;
@@ -2177,7 +2208,7 @@
 
   function renderTabs() {
     var tabs = [
-      ["summary", "Summary"], ["cashflow", "Cashflow"], ["timeline", "Timeline"], ["line-items", "Line Items"],
+      ["summary", "Summary"], ["cashflow", "Cashflow"], ["timeline", "Timeline"], ["line-items", "CF Line Items"],
       ["budget", "Budget"], ["draws", "Draws"], ["cap-table", "Cap Table"], ["cap-table-detail", "Cap Table Detail"],
     ];
     document.getElementById("tabs").innerHTML = tabs.map(function (t) {
@@ -2304,12 +2335,19 @@
       tableSection.className = "cashflow-table-section print-section-boundary print-fit-section" + (!forcePrint && cashflowFullWidth ? " cashflow-table-section--full" : "");
       tableSection.setAttribute("data-fit-key", "cashflowTable");
 
+      var mode = cashflowAmountMode;
+
       if (!forcePrint) {
         var controlsWrap = document.createElement("div");
         controlsWrap.className = "summary-grid-controls";
         controlsWrap.innerHTML = '<button class="link-button" id="highlightMonthBtn">' + (highlightCurrentMonth ? "☑" : "☐") + " highlight current month</button>" +
           '<button class="link-button" id="cfFullWidthBtn">' + (cashflowFullWidth ? "☑" : "☐") + " full width table</button>" +
-          '<button class="link-button" id="cfShowActualsBtn" style="color:var(--actual);">' + (cashflowShowActuals ? "☑" : "☐") + " show actuals</button>" +
+          '<label class="summary-grid-controls__gap" style="color:var(--actual);">Amounts' +
+            '<select id="cfAmountMode">' +
+              '<option value="budget"' + (mode === "budget" ? " selected" : "") + ">Budget</option>" +
+              '<option value="actual"' + (mode === "actual" ? " selected" : "") + ">Actual only</option>" +
+              '<option value="both"' + (mode === "both" ? " selected" : "") + ">Both</option>" +
+            "</select></label>" +
           '<label class="summary-grid-controls__gap">Section spacing<input type="number" id="cfSectionGap" min="0" max="40" value="' + cashflowSectionGapPx + '" />px</label>' +
           '<span class="summary-grid-controls__gap" style="color:var(--text-muted);">right-click a row or cell to color it</span>';
         tableSection.appendChild(controlsWrap);
@@ -2317,7 +2355,7 @@
 
       var gridWrap = document.createElement("div");
       gridWrap.className = "summary-grid-wrap";
-      var html = '<table class="summary-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money summary-grid__budget">Budget</th>';
+      var html = '<table class="summary-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money summary-grid__budget">' + (mode === "actual" ? "Actual" : "Budget") + "</th>";
       summary.months.forEach(function (m, i) { html += '<th class="col-money' + colClass(m) + '"><span class="summary-grid__monthnum">Month ' + (i + 1) + '</span><span class="summary-grid__monthlabel">' + fmtMonth(m) + "</span></th>"; });
       html += "</tr></thead><tbody>";
       html += '<tr class="summary-grid__notes"><td class="summary-grid__label">Notes</td><td class="summary-grid__budget"></td>';
@@ -2336,42 +2374,73 @@
             ? '<button class="link-button summary-grid__expand-toggle" data-toggle-cf-expand="' + li.id + '">' + (isExpanded ? "▾" : "▸") + "</button>"
             : "";
           var rowColorAttr = !forcePrint ? ' data-color-row="' + li.id + '"' : "";
-          html += "<tr>";
-          html += "<td " + coloredTdAttrs("summary-grid__label", li.color) + rowColorAttr + ">" + toggle + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
-          html += "<td " + coloredTdAttrs("col-money summary-grid__budget", li.color) + rowColorAttr + ">" + fmtMoney(li.totalBudget) + "</td>";
-          summary.months.forEach(function (m) {
-            var cellColor = getCellColor(li.id, m) || li.color;
-            var cellAttr = !forcePrint ? ' data-color-cell="' + li.id + "|" + m + '"' : "";
-            html += "<td " + coloredTdAttrs("col-money" + colClass(m), cellColor) + cellAttr + ">" + (li.monthly[m] ? fmtMoney(li.monthly[m]) : "") + "</td>";
-          });
-          html += "</tr>";
-          if (cashflowShowActuals) {
+          if (mode !== "actual") {
+            html += "<tr>";
+            html += "<td " + coloredTdAttrs("summary-grid__label", li.color) + rowColorAttr + ">" + toggle + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
+            html += "<td " + coloredTdAttrs("col-money summary-grid__budget", li.color) + rowColorAttr + ">" + fmtMoney(li.totalBudget) + "</td>";
+            summary.months.forEach(function (m) {
+              var cellColor = getCellColor(li.id, m) || li.color;
+              var cellAttr = !forcePrint ? ' data-color-cell="' + li.id + "|" + m + '"' : "";
+              html += "<td " + coloredTdAttrs("col-money" + colClass(m), cellColor) + cellAttr + ">" + (li.monthly[m] ? fmtMoney(li.monthly[m]) : "") + "</td>";
+            });
+            html += "</tr>";
+          }
+          if (mode === "both") {
             html += actualRowHtml("Actual", li.actualMonthly, li.actualTotal, li.totalBudget, summary.months, colClass);
+          } else if (mode === "actual") {
+            html += "<tr>";
+            html += "<td " + coloredTdAttrs("summary-grid__label", li.color) + rowColorAttr + ">" + toggle + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
+            html += "<td " + coloredTdAttrs("col-money summary-grid__budget", li.color) + rowColorAttr + ">" + (li.actualTotal ? fmtMoney(li.actualTotal) : "") + "</td>";
+            summary.months.forEach(function (m) {
+              var cellColor = getCellColor(li.id, m) || li.color;
+              var cellAttr = !forcePrint ? ' data-color-cell="' + li.id + "|" + m + '"' : "";
+              html += "<td " + coloredTdAttrs("col-money" + colClass(m), cellColor) + cellAttr + ">" + (li.actualMonthly[m] ? fmtMoney(li.actualMonthly[m]) : "") + "</td>";
+            });
+            html += "</tr>";
           }
           if (!forcePrint && isExpanded) {
             li.linkedBudgetItems.forEach(function (bi) {
-              html += '<tr class="summary-grid__budgetline"><td class="summary-grid__label summary-grid__budgetline-desc">' + esc(bi.description) + "</td>";
-              html += '<td class="col-money summary-grid__budget">' + fmtMoney(bi.totalBudget) + "</td>";
-              summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (bi.monthly[m] ? fmtMoney(bi.monthly[m]) : "") + "</td>"; });
-              html += "</tr>";
-              if (cashflowShowActuals) {
+              if (mode !== "actual") {
+                html += '<tr class="summary-grid__budgetline"><td class="summary-grid__label summary-grid__budgetline-desc">' + esc(bi.description) + "</td>";
+                html += '<td class="col-money summary-grid__budget">' + fmtMoney(bi.totalBudget) + "</td>";
+                summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (bi.monthly[m] ? fmtMoney(bi.monthly[m]) : "") + "</td>"; });
+                html += "</tr>";
+              }
+              if (mode === "both") {
                 html += actualRowHtml('<span class="summary-grid__budgetline-desc">Actual</span>', bi.actualMonthly, bi.actualTotal, bi.totalBudget, summary.months, colClass);
+              } else if (mode === "actual") {
+                html += '<tr class="summary-grid__budgetline"><td class="summary-grid__label summary-grid__budgetline-desc">' + esc(bi.description) + "</td>";
+                html += '<td class="col-money summary-grid__budget">' + (bi.actualTotal ? fmtMoney(bi.actualTotal) : "") + "</td>";
+                summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (bi.actualMonthly[m] ? fmtMoney(bi.actualMonthly[m]) : "") + "</td>"; });
+                html += "</tr>";
               }
             });
           }
         });
-        html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money summary-grid__budget\">" + fmtMoney(cat.subtotalTotal) + "</td>";
-        summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (cat.subtotal[m] ? fmtMoney(cat.subtotal[m]) : "") + "</td>"; });
-        html += "</tr>";
-        if (cashflowShowActuals) {
+        if (mode !== "actual") {
+          html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money summary-grid__budget\">" + fmtMoney(cat.subtotalTotal) + "</td>";
+          summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (cat.subtotal[m] ? fmtMoney(cat.subtotal[m]) : "") + "</td>"; });
+          html += "</tr>";
+        }
+        if (mode === "both") {
           html += actualRowHtml("Actual — Total " + esc(cat.name), cat.actualSubtotal, cat.actualSubtotalTotal, cat.subtotalTotal, summary.months, colClass);
+        } else if (mode === "actual") {
+          html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money summary-grid__budget\">" + (cat.actualSubtotalTotal ? fmtMoney(cat.actualSubtotalTotal) : "") + "</td>";
+          summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (cat.actualSubtotal[m] ? fmtMoney(cat.actualSubtotal[m]) : "") + "</td>"; });
+          html += "</tr>";
         }
       });
-      html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money summary-grid__budget">' + fmtMoney(summary.grandTotal.total) + "</td>";
-      summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (summary.grandTotal.monthly[m] ? fmtMoney(summary.grandTotal.monthly[m]) : "") + "</td>"; });
-      html += "</tr>";
-      if (cashflowShowActuals) {
+      if (mode !== "actual") {
+        html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money summary-grid__budget">' + fmtMoney(summary.grandTotal.total) + "</td>";
+        summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (summary.grandTotal.monthly[m] ? fmtMoney(summary.grandTotal.monthly[m]) : "") + "</td>"; });
+        html += "</tr>";
+      }
+      if (mode === "both") {
         html += actualRowHtml("Actual Grand Total", summary.grandTotal.actualMonthly, summary.grandTotal.actualTotal, summary.grandTotal.total, summary.months, colClass);
+      } else if (mode === "actual") {
+        html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money summary-grid__budget">' + (summary.grandTotal.actualTotal ? fmtMoney(summary.grandTotal.actualTotal) : "") + "</td>";
+        summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (summary.grandTotal.actualMonthly[m] ? fmtMoney(summary.grandTotal.actualMonthly[m]) : "") + "</td>"; });
+        html += "</tr>";
       }
       html += "</tbody></table>";
       gridWrap.innerHTML = html;
@@ -2406,8 +2475,8 @@
       if (highlightBtn) highlightBtn.addEventListener("click", function () { highlightCurrentMonth = !highlightCurrentMonth; render(); });
       var fullWidthBtn = wrap.querySelector("#cfFullWidthBtn");
       if (fullWidthBtn) fullWidthBtn.addEventListener("click", function () { cashflowFullWidth = !cashflowFullWidth; render(); });
-      var showActualsBtn = wrap.querySelector("#cfShowActualsBtn");
-      if (showActualsBtn) showActualsBtn.addEventListener("click", function () { cashflowShowActuals = !cashflowShowActuals; render(); });
+      var amountModeSel = wrap.querySelector("#cfAmountMode");
+      if (amountModeSel) amountModeSel.addEventListener("change", function () { cashflowAmountMode = amountModeSel.value; render(); });
       var gapInput = wrap.querySelector("#cfSectionGap");
       if (gapInput) gapInput.addEventListener("change", function () {
         cashflowSectionGapPx = Math.max(0, Math.min(40, Number(gapInput.value) || 0));
@@ -2518,15 +2587,16 @@
   // kind shares one max, so line items become comparable against each other;
   // subtotal and grand-total rows keep their own scales, since folding them into
   // the same max would flatten every individual line to near-nothing.
-  // When includeActuals is set, a row's actual pills share the same max as its budget
-  // pills (rather than each scaling independently), so the two rows stay comparable at
-  // a glance instead of both maxing out their own color range regardless of size.
-  function timelineScaleFor(rows, months, basis, includeActuals) {
+  // mode "both" pools a row's budget and actual pills into one shared max (rather than
+  // each scaling independently), so the two rows stay comparable at a glance instead of
+  // both maxing out their own color range regardless of size. Mode "actual" scales off
+  // the actual series alone, since that's the only series being drawn.
+  function timelineScaleFor(rows, months, basis, mode) {
     function rowMax(row) {
       var mx = 0;
       months.forEach(function (m) {
-        mx = Math.max(mx, Math.abs(row.monthly[m] || 0));
-        if (includeActuals && row.actualMonthly) mx = Math.max(mx, Math.abs(row.actualMonthly[m] || 0));
+        if (mode !== "actual") mx = Math.max(mx, Math.abs(row.monthly[m] || 0));
+        if (mode !== "budget" && row.actualMonthly) mx = Math.max(mx, Math.abs(row.actualMonthly[m] || 0));
       });
       return mx;
     }
@@ -2595,19 +2665,25 @@
         '<label class="cf-timeline-controls__range">Sensitivity' +
           '<input type="range" id="tlSensitivity" min="1" max="5" step="0.1" value="' + t.sensitivity + '" />' +
           '<span id="tlSensitivityVal">' + t.sensitivity + "×</span></label>" +
-        '<button class="link-button" id="tlShowActualsBtn" style="color:var(--actual);">' + (t.showActuals ? "☑" : "☐") + " show actuals</button>";
+        '<label style="color:var(--actual);">Amounts' +
+          '<select id="tlAmountMode">' +
+            '<option value="budget"' + (t.amountMode === "budget" ? " selected" : "") + ">Budget</option>" +
+            '<option value="actual"' + (t.amountMode === "actual" ? " selected" : "") + ">Actual only</option>" +
+            '<option value="both"' + (t.amountMode === "both" ? " selected" : "") + ">Both</option>" +
+          "</select></label>";
       section.appendChild(controls);
     }
 
     var hint = document.createElement("p");
     hint.className = "cf-timeline__hint";
-    hint.textContent = (t.scaleBasis === "project"
+    hint.textContent = (t.amountMode === "actual" ? "Showing actual spend only. " : "") +
+      (t.scaleBasis === "project"
       ? "Shaded across the whole project, so lines are comparable to each other"
       : "Each row is shaded relative to its own peak month") +
       (forcePrint ? "." : " — hover a cell for the amount.");
     section.appendChild(hint);
 
-    var maxFor = timelineScaleFor(rows, summary.months, t.scaleBasis, t.showActuals);
+    var maxFor = timelineScaleFor(rows, summary.months, t.scaleBasis, t.amountMode);
 
     var html = '<table class="cf-heatmap" style="' + timelineSizingCss() + '"><thead><tr>' +
       '<th class="cf-heatmap__label" rowspan="2">Line item</th>' +
@@ -2632,35 +2708,35 @@
         return;
       }
       var rowMax = maxFor(row);
-      var rowClass = row.kind === "subtotal" ? " class=\"cf-heatmap__subtotal\""
-        : row.kind === "grandtotal" ? " class=\"cf-heatmap__grandtotal\"" : "";
-      html += "<tr" + rowClass + ">";
-      html += '<td class="cf-heatmap__label" title="' + esc(row.label) + '">' +
-        (row.code ? '<span class="cf-heatmap__code">' + esc(row.code) + "</span>" : "") + esc(row.label) + "</td>";
-      html += '<td class="cf-heatmap__row-total">' + fmtMoney(row.total) + "</td>";
-      summary.months.forEach(function (m) {
-        var v = row.monthly[m] || 0;
-        var cls = "cf-heatmap__cell" + (v ? "" : " cf-heatmap__cell--empty") +
-          (highlightCurrentMonth && m === thisMonth ? " cf-heatmap__current" : "");
-        var pillStyle = v ? ' style="background:' + heatFill(rowMax > 0 ? Math.abs(v) / rowMax : 0, t.colorScheme, t.sensitivity) + ';"' : "";
-        var data = v ? ' data-hm-row="' + ri + '" data-hm-month="' + m + '"' : "";
-        html += '<td class="' + cls + '"' + data + '><span class="cf-heatmap__pill"' + pillStyle + "></span></td>";
-      });
-      html += "</tr>";
+      var baseRowClass = row.kind === "subtotal" ? "cf-heatmap__subtotal"
+        : row.kind === "grandtotal" ? "cf-heatmap__grandtotal" : "";
 
-      if (t.showActuals) {
-        html += '<tr class="cf-heatmap__actual-row"><td class="cf-heatmap__label cf-heatmap__actual-label">↳ Actual</td>';
-        html += '<td class="cf-heatmap__row-total">' + (row.actualTotal ? fmtMoney(row.actualTotal) : "") + "</td>";
+      // thin: renders as the dimmer, half-height companion row (used for the actual
+      // series only when both series are shown together). series: which data source
+      // the cells read from and tag onto data-hm-series, for the tooltip to key off.
+      function pillRowHtml(dataMap, totalVal, thin, series) {
+        var rowClasses = (baseRowClass ? [baseRowClass] : []).concat(thin ? ["cf-heatmap__actual-row"] : []);
+        var out = "<tr" + (rowClasses.length ? ' class="' + rowClasses.join(" ") + '"' : "") + ">";
+        out += '<td class="cf-heatmap__label' + (thin ? " cf-heatmap__actual-label" : "") + '" title="' + esc(row.label) + '">' +
+          (thin ? "↳ Actual" : (row.code ? '<span class="cf-heatmap__code">' + esc(row.code) + "</span>" : "") + esc(row.label)) + "</td>";
+        out += '<td class="cf-heatmap__row-total">' + (totalVal ? fmtMoney(totalVal) : "") + "</td>";
         summary.months.forEach(function (m) {
-          var v = (row.actualMonthly && row.actualMonthly[m]) || 0;
-          var cls = "cf-heatmap__cell cf-heatmap__cell--actual" + (v ? "" : " cf-heatmap__cell--empty") +
+          var v = (dataMap && dataMap[m]) || 0;
+          var cls = "cf-heatmap__cell" + (thin ? " cf-heatmap__cell--actual" : "") + (v ? "" : " cf-heatmap__cell--empty") +
             (highlightCurrentMonth && m === thisMonth ? " cf-heatmap__current" : "");
           var pillStyle = v ? ' style="background:' + heatFill(rowMax > 0 ? Math.abs(v) / rowMax : 0, t.colorScheme, t.sensitivity) + ';"' : "";
-          var data = v ? ' data-hm-row="' + ri + '" data-hm-month="' + m + '" data-hm-actual="1"' : "";
-          html += '<td class="' + cls + '"' + data + '><span class="cf-heatmap__pill cf-heatmap__pill--actual"' + pillStyle + "></span></td>";
+          var data = v ? ' data-hm-row="' + ri + '" data-hm-month="' + m + '" data-hm-series="' + series + '"' : "";
+          out += '<td class="' + cls + '"' + data + '><span class="cf-heatmap__pill' + (thin ? " cf-heatmap__pill--actual" : "") + '"' + pillStyle + "></span></td>";
         });
-        html += "</tr>";
+        out += "</tr>";
+        return out;
       }
+
+      if (t.amountMode === "actual") html += pillRowHtml(row.actualMonthly, row.actualTotal, false, "actual");
+      else if (t.amountMode === "both") {
+        html += pillRowHtml(row.monthly, row.total, false, "budget");
+        html += pillRowHtml(row.actualMonthly, row.actualTotal, true, "actual");
+      } else html += pillRowHtml(row.monthly, row.total, false, "budget");
     });
     html += "</tbody></table>";
 
@@ -2678,7 +2754,7 @@
         if (!td) { tooltip.style.display = "none"; return; }
         var row = rows[Number(td.getAttribute("data-hm-row"))];
         var month = td.getAttribute("data-hm-month");
-        var isActual = td.hasAttribute("data-hm-actual");
+        var isActual = td.getAttribute("data-hm-series") === "actual";
         var amount = (isActual ? (row.actualMonthly && row.actualMonthly[month]) : row.monthly[month]) || 0;
         var rowTotal = isActual ? row.actualTotal : row.total;
         var share = rowTotal ? (amount / rowTotal) * 100 : 0;
@@ -2731,9 +2807,9 @@
         persist();
         render();
       });
-      var showActualsBtn = section.querySelector("#tlShowActualsBtn");
-      if (showActualsBtn) showActualsBtn.addEventListener("click", function () {
-        timelineSettings.showActuals = !timelineSettings.showActuals;
+      var amountModeSel = section.querySelector("#tlAmountMode");
+      if (amountModeSel) amountModeSel.addEventListener("change", function () {
+        timelineSettings.amountMode = amountModeSel.value;
         persist();
         render();
       });
@@ -4455,8 +4531,10 @@
   // ---------- theme picker ----------
   var THEME_MODES = [["system", "System"], ["light", "Light"], ["dark", "Dark"]];
   var THEME_ACCENTS = ["blue", "green", "purple", "orange", "rose", "black"];
+  var THEME_ACTUAL_ACCENTS = ["teal", "green", "blue", "purple", "amber", "rose"];
   function getThemeMode() { return localStorage.getItem("cf-theme-mode") || "system"; }
   function getThemeAccent() { return localStorage.getItem("cf-theme-accent") || "blue"; }
+  function getThemeActualAccent() { return localStorage.getItem("cf-theme-actual-accent") || "teal"; }
   function setThemeMode(mode) {
     localStorage.setItem("cf-theme-mode", mode);
     if (mode === "system") document.documentElement.removeAttribute("data-theme");
@@ -4466,9 +4544,13 @@
     localStorage.setItem("cf-theme-accent", accent);
     document.documentElement.setAttribute("data-accent", accent);
   }
+  function setThemeActualAccent(accent) {
+    localStorage.setItem("cf-theme-actual-accent", accent);
+    document.documentElement.setAttribute("data-actual-accent", accent);
+  }
   function renderThemePanel() {
     var panel = document.getElementById("themePickerPanel");
-    var mode = getThemeMode(), accent = getThemeAccent();
+    var mode = getThemeMode(), accent = getThemeAccent(), actualAccent = getThemeActualAccent();
     var html = '<p class="theme-picker__title">Mode</p><div class="theme-picker__modes">';
     THEME_MODES.forEach(function (m) {
       html += '<button class="theme-picker__mode-btn' + (mode === m[0] ? " theme-picker__mode-btn--active" : "") + '" data-mode="' + m[0] + '">' + m[1] + "</button>";
@@ -4477,6 +4559,10 @@
     THEME_ACCENTS.forEach(function (a) {
       html += '<button class="theme-picker__swatch theme-picker__swatch--' + a + (accent === a ? " theme-picker__swatch--active" : "") + '" data-accent="' + a + '" aria-label="' + a + '" title="' + a + '"></button>';
     });
+    html += '</div><p class="theme-picker__title">Actuals color</p><div class="theme-picker__accents">';
+    THEME_ACTUAL_ACCENTS.forEach(function (a) {
+      html += '<button class="theme-picker__swatch theme-picker__swatch--' + a + (actualAccent === a ? " theme-picker__swatch--active" : "") + '" data-actual-accent="' + a + '" aria-label="' + a + '" title="' + a + '"></button>';
+    });
     html += "</div>";
     panel.innerHTML = html;
     panel.querySelectorAll("[data-mode]").forEach(function (btn) {
@@ -4484,6 +4570,9 @@
     });
     panel.querySelectorAll("[data-accent]").forEach(function (btn) {
       btn.addEventListener("click", function () { setThemeAccent(btn.getAttribute("data-accent")); renderThemePanel(); });
+    });
+    panel.querySelectorAll("[data-actual-accent]").forEach(function (btn) {
+      btn.addEventListener("click", function () { setThemeActualAccent(btn.getAttribute("data-actual-accent")); renderThemePanel(); });
     });
   }
   document.getElementById("themePickerBtn").addEventListener("click", function () {
