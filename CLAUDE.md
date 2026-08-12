@@ -10,18 +10,18 @@ CF ("Cashflow Tracker") is a cashflow tracking tool for real estate development 
 
 This repo contains **the same app implemented four separate times**, and they are *not* built from a shared source — each is hand-maintained independently:
 
-| | `frontend/` | `docs/index.html` | `docs/apps-script-v0.4.html` + `apps-script/Code.gs` | `docs/apps-script-v0.3.html`, `docs/apps-script-v0.2.html`, `docs/apps-script-v0.1.html` |
+| | `frontend/` | `docs/index.html` | `docs/apps-script-v0.5.html` + `apps-script/Code.gs` | `docs/apps-script-v0.4.html`, `docs/apps-script-v0.3.html`, `docs/apps-script-v0.2.html`, `docs/apps-script-v0.1.html` |
 |---|---|---|---|---|
 | Tech | React/TS/Vite, built with npm | Single-file vanilla HTML/CSS/JS | Single-file vanilla HTML/CSS/JS + Apps Script backend | Single-file vanilla HTML/CSS/JS (frozen snapshots) |
 | Talks to | Sheets API directly | Sheets API directly | `apps-script/Code.gs` over JSONP/hidden-form (CORS workaround) | superseded |
 | Status | stale | stale | **active — edit this one** | never edit |
 | Auth | Google OAuth Client ID | Google OAuth Client ID | none (Apps Script runs as the deployer) | — |
 
-**Check `git log` before assuming a feature exists everywhere.** As of this writing, `frontend/` and `docs/index.html` were last kept in sync with `docs/apps-script-v0.2.html`/`apps-script/Code.gs` around commit `c73a2f0`/`19cc443`. Every commit since then (recurring-draws refinements, Budget tab, CSV import, detailed cap-table waterfall, print-settings persistence, cell coloring, the v0.3 cashflow timeline heatmap, the v0.4 print-preview rework, etc.) has only touched the active Apps Script page and `apps-script/Code.gs` — `frontend/` and `docs/index.html` do **not** have those features. Don't assume parity; grep/diff the actual files.
+**Check `git log` before assuming a feature exists everywhere.** As of this writing, `frontend/` and `docs/index.html` were last kept in sync with `docs/apps-script-v0.2.html`/`apps-script/Code.gs` around commit `c73a2f0`/`19cc443`. Every commit since then (recurring-draws refinements, Budget tab, CSV import, detailed cap-table waterfall, print-settings persistence, cell coloring, the v0.3 cashflow timeline heatmap, the v0.4 print-preview rework, the v0.5 actuals-tracking feature, etc.) has only touched the active Apps Script page and `apps-script/Code.gs` — `frontend/` and `docs/index.html` do **not** have those features. Don't assume parity; grep/diff the actual files.
 
-When asked to add a feature "to the app" without qualification, ask which variant(s) — or check which one recent commits have been targeting (currently `docs/apps-script-v0.4.html` + `apps-script/Code.gs`) — before picking a scope. When porting a feature between variants, the calculation logic (schedule spreading, cap table pro-rata math, summary aggregation, recurring draw generation) needs to be reimplemented in the target's style (typed `frontend/src/lib/*.ts` module vs. inline vanilla-JS function), not copy-pasted verbatim.
+When asked to add a feature "to the app" without qualification, ask which variant(s) — or check which one recent commits have been targeting (currently `docs/apps-script-v0.5.html` + `apps-script/Code.gs`) — before picking a scope. When porting a feature between variants, the calculation logic (schedule spreading, cap table pro-rata math, summary aggregation, recurring draw generation) needs to be reimplemented in the target's style (typed `frontend/src/lib/*.ts` module vs. inline vanilla-JS function), not copy-pasted verbatim.
 
-GitHub Pages serves `docs/` (`main` branch, `/docs` folder) — `docs/index.html` and every `docs/apps-script-v0.*.html` are all live; `apps-script-v0.4.html` is the current one. `frontend/` is not auto-deployed; it must be built and hosted separately (see README's "Deploying" section) since a Pages site can only have one active source.
+GitHub Pages serves `docs/` (`main` branch, `/docs` folder) — `docs/index.html` and every `docs/apps-script-v0.*.html` are all live; `apps-script-v0.5.html` is the current one. `frontend/` is not auto-deployed; it must be built and hosted separately (see README's "Deploying" section) since a Pages site can only have one active source.
 
 ## `frontend/` — commands
 
@@ -36,7 +36,7 @@ npm run preview      # preview a production build
 
 There is no test suite (`playwright` is a devDependency but there's no `test` script, config, or spec files yet — don't assume Playwright tests exist). `npm run build` runs the TypeScript project-reference build (`tsconfig.app.json` / `tsconfig.node.json`) before bundling, so a broken type is a build failure, not just a lint warning. There's no single-test invocation because there are no tests to target.
 
-The other variants (`docs/index.html`, `docs/apps-script-v0.4.html`, and the frozen `docs/apps-script-v0.3.html` / `v0.2` / `v0.1`) are single self-contained HTML files with no build step — edit and open directly in a browser, or serve statically.
+The other variants (`docs/index.html`, `docs/apps-script-v0.5.html`, and the frozen `docs/apps-script-v0.4.html` / `v0.3` / `v0.2` / `v0.1`) are single self-contained HTML files with no build step — edit and open directly in a browser, or serve statically.
 
 ## `frontend/` architecture
 
@@ -58,7 +58,7 @@ Data flow: **Google Sheet (raw rows) → `lib/sheets/mapping.ts` → typed `Proj
 
 ## Sheet schema
 
-Each project spreadsheet has tabs: `Project`, `Categories`, `LineItems`, `Payments`, `Draws`, `CapTable`, `Contributions`, `Distributions` (the `frontend/`/`docs/index.html` set — see `TAB_SCHEMA` in `frontend/src/lib/sheets/client.ts` for exact column order). `apps-script/Code.gs`'s backend additionally has `CapitalReturns`, `BudgetSections`, `BudgetItems`, `BudgetPayments`, `CellColors` for its extra Budget/detailed-cap-table/coloring features — the tab sets are **not** identical between variants. Row 1 is always the header; both the read and write paths key strictly on column position, not header names, so reordering `TAB_SCHEMA` (or the equivalent in `Code.gs`) is a breaking change for existing spreadsheets.
+Each project spreadsheet has tabs: `Project`, `Categories`, `LineItems`, `Payments`, `Draws`, `CapTable`, `Contributions`, `Distributions` (the `frontend/`/`docs/index.html` set — see `TAB_SCHEMA` in `frontend/src/lib/sheets/client.ts` for exact column order). `apps-script/Code.gs`'s backend additionally has `CapitalReturns`, `BudgetSections`, `BudgetItems`, `BudgetPayments`, `CellColors`, `LineItemActuals`, `BudgetItemActuals` for its extra Budget/detailed-cap-table/coloring/actuals-tracking features, plus `actualDate`/`actualAmount` columns on `Draws` — the tab sets are **not** identical between variants. Row 1 is always the header; both the read and write paths key strictly on column position, not header names, so reordering `TAB_SCHEMA` (or the equivalent in `Code.gs`) is a breaking change for existing spreadsheets.
 
 ## Conventions worth preserving
 

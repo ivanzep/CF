@@ -4,7 +4,7 @@
  * Bind this script to a Google Sheet (Extensions > Apps Script), deploy it
  * as a web app (Deploy > New deployment > Web app, access: Anyone), and
  * use the resulting /exec URL as the API endpoint for the static frontend
- * in docs/apps-script-v0.4.html (hosted separately, e.g. on GitHub Pages). All
+ * in docs/apps-script-v0.5.html (hosted separately, e.g. on GitHub Pages). All
  * data lives in tabs on the bound spreadsheet.
  *
  * Apps Script web app responses don't carry CORS headers, so a visiting
@@ -38,7 +38,8 @@ var TAB_SCHEMA = {
   Categories: ["id", "name", "sortOrder"],
   LineItems: ["id", "categoryId", "code", "description", "totalBudget", "scheduleMode", "startDate", "endDate", "sortOrder", "color"],
   Payments: ["id", "lineItemId", "date", "amount"],
-  Draws: ["id", "name", "date", "amount", "source", "sortOrder"],
+  LineItemActuals: ["id", "lineItemId", "date", "amount", "note"],
+  Draws: ["id", "name", "date", "amount", "source", "sortOrder", "actualDate", "actualAmount"],
   CapTable: ["id", "name", "role", "ownershipPercent", "sortOrder"],
   Contributions: ["id", "memberId", "date", "amount", "note"],
   Distributions: ["id", "memberId", "date", "amount", "note"],
@@ -46,6 +47,7 @@ var TAB_SCHEMA = {
   BudgetSections: ["id", "name", "sortOrder"],
   BudgetItems: ["id", "sectionId", "description", "linkedLineItemId", "totalBudget", "scheduleMode", "startDate", "endDate", "sortOrder"],
   BudgetPayments: ["id", "budgetItemId", "date", "amount"],
+  BudgetItemActuals: ["id", "budgetItemId", "date", "amount", "note"],
   CellColors: ["lineItemId", "month", "color"],
 };
 
@@ -55,12 +57,14 @@ var DATE_COLUMNS = {
   Project: [6, 8, 9],
   LineItems: [7, 8],
   Payments: [3],
-  Draws: [3],
+  LineItemActuals: [3],
+  Draws: [3, 7],
   Contributions: [3],
   Distributions: [3],
   CapitalReturns: [3],
   BudgetItems: [7, 8],
   BudgetPayments: [3],
+  BudgetItemActuals: [3],
   CellColors: [2],
 };
 
@@ -229,6 +233,7 @@ function getProject() {
       sortOrder: num_(row[8]),
       color: strOrNull_(row[9]),
       payments: [],
+      actuals: [],
     };
   });
   var lineItemsById = {};
@@ -236,6 +241,10 @@ function getProject() {
   readTab_("Payments").forEach(function (row) {
     var li = lineItemsById[str_(row[1])];
     if (li) li.payments.push({ id: str_(row[0]), date: str_(row[2]), amount: num_(row[3]) });
+  });
+  readTab_("LineItemActuals").forEach(function (row) {
+    var li = lineItemsById[str_(row[1])];
+    if (li) li.actuals.push({ id: str_(row[0]), date: str_(row[2]), amount: num_(row[3]), note: strOrNull_(row[4]) });
   });
 
   var capTable = readTab_("CapTable").map(function (row) {
@@ -277,6 +286,7 @@ function getProject() {
       endDate: strOrNull_(row[7]),
       sortOrder: num_(row[8]),
       payments: [],
+      actuals: [],
     };
   });
   var budgetItemsById = {};
@@ -284,6 +294,10 @@ function getProject() {
   readTab_("BudgetPayments").forEach(function (row) {
     var bi = budgetItemsById[str_(row[1])];
     if (bi) bi.payments.push({ id: str_(row[0]), date: str_(row[2]), amount: num_(row[3]) });
+  });
+  readTab_("BudgetItemActuals").forEach(function (row) {
+    var bi = budgetItemsById[str_(row[1])];
+    if (bi) bi.actuals.push({ id: str_(row[0]), date: str_(row[2]), amount: num_(row[3]), note: strOrNull_(row[4]) });
   });
 
   return {
@@ -309,7 +323,8 @@ function getProject() {
     }),
     lineItems: lineItems,
     draws: readTab_("Draws").map(function (row) {
-      return { id: str_(row[0]), name: str_(row[1]), date: str_(row[2]), amount: num_(row[3]), source: strOrNull_(row[4]), sortOrder: num_(row[5]) };
+      return { id: str_(row[0]), name: str_(row[1]), date: str_(row[2]), amount: num_(row[3]), source: strOrNull_(row[4]), sortOrder: num_(row[5]),
+        actualDate: strOrNull_(row[6]), actualAmount: numOrNull_(row[7]) };
     }),
     capTable: capTable,
     budgetSections: readTab_("BudgetSections").map(function (row) {
@@ -338,7 +353,12 @@ function saveProject(project) {
   writeTab_("Payments", project.lineItems.reduce(function (acc, li) {
     return acc.concat(li.payments.map(function (p) { return [p.id, li.id, p.date, p.amount]; }));
   }, []));
-  writeTab_("Draws", project.draws.map(function (d) { return [d.id, d.name, d.date, d.amount, d.source || "", d.sortOrder]; }));
+  writeTab_("LineItemActuals", project.lineItems.reduce(function (acc, li) {
+    return acc.concat((li.actuals || []).map(function (a) { return [a.id, li.id, a.date, a.amount, a.note || ""]; }));
+  }, []));
+  writeTab_("Draws", project.draws.map(function (d) {
+    return [d.id, d.name, d.date, d.amount, d.source || "", d.sortOrder, d.actualDate || "", d.actualAmount == null ? "" : d.actualAmount];
+  }));
   writeTab_("CapTable", project.capTable.map(function (m) { return [m.id, m.name, m.role, m.ownershipPercent == null ? "" : m.ownershipPercent, m.sortOrder]; }));
   writeTab_("Contributions", project.capTable.reduce(function (acc, m) {
     return acc.concat(m.contributions.map(function (c) { return [c.id, m.id, c.date, c.amount, c.note || ""]; }));
@@ -355,6 +375,9 @@ function saveProject(project) {
   }));
   writeTab_("BudgetPayments", (project.budgetItems || []).reduce(function (acc, bi) {
     return acc.concat(bi.payments.map(function (p) { return [p.id, bi.id, p.date, p.amount]; }));
+  }, []));
+  writeTab_("BudgetItemActuals", (project.budgetItems || []).reduce(function (acc, bi) {
+    return acc.concat((bi.actuals || []).map(function (a) { return [a.id, bi.id, a.date, a.amount, a.note || ""]; }));
   }, []));
   writeTab_("CellColors", (project.cashflowCellColors || []).map(function (c) { return [c.lineItemId, c.month, c.color]; }));
 
