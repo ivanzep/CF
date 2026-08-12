@@ -68,41 +68,10 @@
     }
   }
 
-  /* Accent color alternatives */
-  :root[data-accent="green"] { --accent: #2e9e5b; --accent-bg: rgba(46, 158, 91, 0.1); }
-  :root[data-accent="purple"] { --accent: #7c5cff; --accent-bg: rgba(124, 92, 255, 0.1); }
-  :root[data-accent="orange"] { --accent: #c8720a; --accent-bg: rgba(200, 114, 10, 0.1); }
-  :root[data-accent="rose"] { --accent: #c23b6b; --accent-bg: rgba(194, 59, 107, 0.1); }
-  :root[data-accent="black"] { --accent: #1a1a1a; --accent-bg: rgba(26, 26, 26, 0.08); }
-  :root[data-theme="dark"][data-accent="green"] { --accent: #3fc178; --accent-bg: rgba(63, 193, 120, 0.15); }
-  :root[data-theme="dark"][data-accent="purple"] { --accent: #9277ff; --accent-bg: rgba(146, 119, 255, 0.15); }
-  :root[data-theme="dark"][data-accent="orange"] { --accent: #e08a2b; --accent-bg: rgba(224, 138, 43, 0.15); }
-  :root[data-theme="dark"][data-accent="rose"] { --accent: #e35a8c; --accent-bg: rgba(227, 90, 140, 0.15); }
-  :root[data-theme="dark"][data-accent="black"] { --accent: #e5e5e5; --accent-bg: rgba(229, 229, 229, 0.15); }
-
-  /* Actuals accent alternatives — independent of the general accent color above. */
-  :root[data-actual-accent="green"] { --actual: #2e9e5b; --actual-bg: rgba(46, 158, 91, 0.1); }
-  :root[data-actual-accent="blue"] { --actual: #2a78d6; --actual-bg: rgba(42, 120, 214, 0.1); }
-  :root[data-actual-accent="purple"] { --actual: #7c5cff; --actual-bg: rgba(124, 92, 255, 0.1); }
-  :root[data-actual-accent="amber"] { --actual: #c8720a; --actual-bg: rgba(200, 114, 10, 0.1); }
-  :root[data-actual-accent="rose"] { --actual: #c23b6b; --actual-bg: rgba(194, 59, 107, 0.1); }
-  :root[data-theme="dark"][data-actual-accent="green"] { --actual: #3fc178; --actual-bg: rgba(63, 193, 120, 0.15); }
-  :root[data-theme="dark"][data-actual-accent="blue"] { --actual: #3987e5; --actual-bg: rgba(57, 135, 229, 0.15); }
-  :root[data-theme="dark"][data-actual-accent="purple"] { --actual: #9277ff; --actual-bg: rgba(146, 119, 255, 0.15); }
-  :root[data-theme="dark"][data-actual-accent="amber"] { --actual: #e08a2b; --actual-bg: rgba(224, 138, 43, 0.15); }
-  :root[data-theme="dark"][data-actual-accent="rose"] { --actual: #e35a8c; --actual-bg: rgba(227, 90, 140, 0.15); }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"])[data-accent="green"] { --accent: #3fc178; --accent-bg: rgba(63, 193, 120, 0.15); }
-    :root:not([data-theme="light"])[data-accent="purple"] { --accent: #9277ff; --accent-bg: rgba(146, 119, 255, 0.15); }
-    :root:not([data-theme="light"])[data-accent="orange"] { --accent: #e08a2b; --accent-bg: rgba(224, 138, 43, 0.15); }
-    :root:not([data-theme="light"])[data-accent="rose"] { --accent: #e35a8c; --accent-bg: rgba(227, 90, 140, 0.15); }
-    :root:not([data-theme="light"])[data-accent="black"] { --accent: #e5e5e5; --accent-bg: rgba(229, 229, 229, 0.15); }
-    :root:not([data-theme="light"])[data-actual-accent="green"] { --actual: #3fc178; --actual-bg: rgba(63, 193, 120, 0.15); }
-    :root:not([data-theme="light"])[data-actual-accent="blue"] { --actual: #3987e5; --actual-bg: rgba(57, 135, 229, 0.15); }
-    :root:not([data-theme="light"])[data-actual-accent="purple"] { --actual: #9277ff; --actual-bg: rgba(146, 119, 255, 0.15); }
-    :root:not([data-theme="light"])[data-actual-accent="amber"] { --actual: #e08a2b; --actual-bg: rgba(224, 138, 43, 0.15); }
-    :root:not([data-theme="light"])[data-actual-accent="rose"] { --actual: #e35a8c; --actual-bg: rgba(227, 90, 140, 0.15); }
-  }
+  /* Custom accent/actuals colors (user-picked) are applied as inline styles on
+     :root by the theme picker's <input type="color">, not as CSS here — see
+     applyCustomColor()/refreshCustomColors() in the theme-picker script below.
+     Absent a custom pick, the --accent/--actual defaults above (light/dark) apply. */
 
   * { box-sizing: border-box; }
   html, body { margin: 0; }
@@ -232,19 +201,22 @@
   .mini-table input { width: 130px; }
 
   .summary-grid-wrap { overflow: auto; max-height: 70vh; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
-  .summary-grid { font-size: 12.5px; }
-  .summary-grid th, .summary-grid td { padding: 5px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  /* --cf-zoom is a live-updating multiplier (1 = 100%) set on .summary-grid-wrap by the
+     Zoom slider — kept to a plain CSS custom property (not a full re-render) so dragging
+     the slider stays smooth even on large grids. */
+  .summary-grid { font-size: calc(12.5px * var(--cf-zoom, 1)); }
+  .summary-grid th, .summary-grid td { padding: calc(5px * var(--cf-zoom, 1)) calc(10px * var(--cf-zoom, 1)); border-bottom: 1px solid var(--border); white-space: nowrap; }
   .summary-grid th { position: sticky; top: 0; background: var(--surface); color: var(--text-muted); font-weight: 500; text-align: right; z-index: 2; }
   .summary-grid__label { text-align: left !important; position: sticky; left: 0; background: var(--surface); min-width: 260px; z-index: 1; }
   .summary-grid__budget { position: sticky; left: var(--budget-col-left, 260px); background: var(--surface); box-shadow: 2px 0 4px -2px rgba(0,0,0,0.15); z-index: 1; }
   .summary-grid th.summary-grid__label, .summary-grid th.summary-grid__budget { z-index: 3; }
   .summary-grid__code { color: var(--text-muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
-  .summary-grid__monthnum { display: block; font-size: 9.5px; font-weight: 400; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; }
+  .summary-grid__monthnum { display: block; font-size: calc(9.5px * var(--cf-zoom, 1)); font-weight: 400; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; }
   .summary-grid__monthlabel { display: block; }
-  .summary-grid__category td { font-weight: 600; background: var(--page); border-top: 2px solid var(--border-strong); padding-top: calc(5px + var(--section-gap, 0px)); }
+  .summary-grid__category td { font-weight: 600; background: var(--page); border-top: 2px solid var(--border-strong); padding-top: calc(5px * var(--cf-zoom, 1) + var(--section-gap, 0px)); }
   .summary-grid__category td.summary-grid__label, .summary-grid__category td.summary-grid__budget { background: var(--page); }
   .summary-grid__subtotal td { font-weight: 600; border-top: 1px solid var(--border-strong); }
-  .summary-grid__grandtotal td { font-weight: 700; border-top: 2px solid var(--border-strong); font-size: 13.5px; }
+  .summary-grid__grandtotal td { font-weight: 700; border-top: 2px solid var(--border-strong); font-size: calc(13.5px * var(--cf-zoom, 1)); }
   .summary-grid-controls { display: flex; align-items: center; justify-content: flex-end; gap: 16px; margin-bottom: 10px; position: relative; z-index: 4; }
   .summary-grid-controls__gap { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
   .summary-grid-controls__gap input { width: 48px; }
@@ -262,16 +234,20 @@
   .cashflow-table-section--full { width: 100vw; max-width: 100vw; box-sizing: border-box; margin-left: calc(-50vw + 50%); margin-right: calc(-50vw + 50%); padding: 0 24px; }
   .summary-grid__expand-toggle { background: none; border: none; cursor: pointer; padding: 0 6px 0 0; color: var(--text-muted); font-size: 10px; vertical-align: middle; }
   .summary-grid__expand-toggle:hover { color: var(--text-primary); }
-  .summary-grid__budgetline td { color: var(--text-muted); font-size: 11.5px; font-weight: 400 !important; }
+  .summary-grid__budgetline td { color: var(--text-muted); font-size: calc(11.5px * var(--cf-zoom, 1)); font-weight: 400 !important; }
   .summary-grid__budgetline td.summary-grid__label, .summary-grid__budgetline td.summary-grid__budget { background: var(--surface); }
   .summary-grid__budgetline-desc { padding-left: 20px; }
-  .summary-grid__actual td { color: var(--actual); font-size: 11.5px; font-style: italic; background: var(--actual-bg) !important; border-bottom: 1px solid var(--border); }
-  .summary-grid__actual td.summary-grid__label, .summary-grid__actual td.summary-grid__budget { background: var(--actual-bg) !important; }
+  .summary-grid__actual td { color: var(--actual); font-size: calc(11.5px * var(--cf-zoom, 1)); font-style: italic; background: var(--actual-bg) !important; border-bottom: 1px solid var(--border); }
+  /* The sticky label/budget columns need an OPAQUE background, not the translucent
+     --actual-bg used elsewhere in the row — a translucent sticky cell lets the
+     month columns scrolling underneath show through their text as they pass beneath
+     it, so mix the tint into --surface (opaque) instead of layering it on with alpha. */
+  .summary-grid__actual td.summary-grid__label, .summary-grid__actual td.summary-grid__budget { background: color-mix(in srgb, var(--actual) 12%, var(--surface)) !important; }
   .summary-grid__actual-label { padding-left: 20px; }
   .summary-grid td.summary-grid__month--current, .summary-grid th.summary-grid__month--current { background: var(--accent-bg) !important; }
   .summary-grid__year-b { background: var(--year-shade); }
   .summary-grid__notes td { background: var(--surface); border-bottom: 2px solid var(--border-strong); }
-  .summary-grid__notenote { width: 100%; min-width: 90px; border: 1px solid transparent; background: transparent; color: var(--text-secondary); font-size: 11px; font-style: italic; padding: 3px 4px; border-radius: 4px; }
+  .summary-grid__notenote { width: 100%; min-width: 90px; border: 1px solid transparent; background: transparent; color: var(--text-secondary); font-size: calc(11px * var(--cf-zoom, 1)); font-style: italic; padding: 3px 4px; border-radius: 4px; }
   .summary-grid__notenote:hover, .summary-grid__notenote:focus { border-color: var(--border); font-style: normal; outline: none; }
 
   .cashflow-chart { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
@@ -382,6 +358,19 @@
     font-size: 12.5px; opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 50;
   }
   .toast--visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Excel-like cashflow cell selection: a status bar pinned to the bottom of the
+     viewport (outside the re-rendered tab content, so it survives across renders)
+     plus an outline on selected <td>s that draws over any cell/row coloring or the
+     actual-row background since those set `background` with !important. */
+  .cf-selection-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 80; display: none;
+    align-items: center; justify-content: flex-end; gap: 24px; padding: 8px 24px;
+    background: var(--surface); border-top: 1px solid var(--border-strong);
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.08); font-size: 12.5px; color: var(--text-secondary);
+  }
+  .cf-selection-bar strong { color: var(--text-primary); font-variant-numeric: tabular-nums; margin-left: 4px; }
+  .summary-grid__cell--selected { outline: 2px solid var(--accent); outline-offset: -2px; }
 
   .setup-gate { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
   .setup-gate__card { max-width: 480px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 32px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 16px; }
@@ -616,26 +605,38 @@
   .theme-picker__modes { display: flex; gap: 6px; }
   .theme-picker__mode-btn { flex: 1; background: var(--page); border: 1px solid var(--border); border-radius: 6px; padding: 5px 0; font-size: 12px; cursor: pointer; color: var(--text-primary); }
   .theme-picker__mode-btn--active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
-  .theme-picker__accents { display: flex; gap: 8px; }
-  .theme-picker__swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
-  .theme-picker__swatch--active { border-color: var(--text-primary); }
-  .theme-picker__swatch--blue { background: #2a78d6; }
-  .theme-picker__swatch--green { background: #2e9e5b; }
-  .theme-picker__swatch--purple { background: #7c5cff; }
-  .theme-picker__swatch--orange { background: #c8720a; }
-  .theme-picker__swatch--rose { background: #c23b6b; }
-  .theme-picker__swatch--black { background: #1a1a1a; }
-  .theme-picker__swatch--teal { background: #0a8f6b; }
-  .theme-picker__swatch--amber { background: #c8720a; }
+  .theme-picker__color-row { display: flex; align-items: center; gap: 8px; }
+  .theme-picker__color-row input[type="color"] { width: 32px; height: 26px; border: 1px solid var(--border); border-radius: 6px; padding: 2px; cursor: pointer; background: var(--page); }
+  .theme-picker__color-reset { font-size: 11px; color: var(--text-muted); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0; }
 </style>
 <script>
   (function () {
     var storedMode = localStorage.getItem("cf-theme-mode");
     if (storedMode && storedMode !== "system") document.documentElement.setAttribute("data-theme", storedMode);
-    var storedAccent = localStorage.getItem("cf-theme-accent");
-    if (storedAccent) document.documentElement.setAttribute("data-accent", storedAccent);
-    var storedActualAccent = localStorage.getItem("cf-theme-actual-accent");
-    if (storedActualAccent) document.documentElement.setAttribute("data-actual-accent", storedActualAccent);
+    var isDark = storedMode === "dark" || (storedMode !== "light" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+
+    // Legacy preset-name maps, for browsers that still have the old swatch-picker
+    // localStorage keys (pre-custom-color-picker) and haven't run the main script's
+    // one-time migration yet — keeps the very first paint from flashing default colors.
+    var LEGACY_ACCENT_HEX = { blue: "#2a78d6", green: "#2e9e5b", purple: "#7c5cff", orange: "#c8720a", rose: "#c23b6b", black: "#1a1a1a" };
+    var LEGACY_ACTUAL_HEX = { teal: "#0a8f6b", green: "#2e9e5b", blue: "#2a78d6", purple: "#7c5cff", amber: "#c8720a", rose: "#c23b6b" };
+
+    function hexToRgb(hex) {
+      var h = hex.replace("#", "");
+      if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      var num = parseInt(h, 16);
+      return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+    }
+    function applyCustomColor(varName, hex) {
+      document.documentElement.style.setProperty(varName, hex);
+      var rgb = hexToRgb(hex);
+      document.documentElement.style.setProperty(varName + "-bg", "rgba(" + rgb.join(",") + "," + (isDark ? 0.15 : 0.1) + ")");
+    }
+
+    var accentColor = localStorage.getItem("cf-theme-accent-color") || LEGACY_ACCENT_HEX[localStorage.getItem("cf-theme-accent")];
+    if (accentColor) applyCustomColor("--accent", accentColor);
+    var actualColor = localStorage.getItem("cf-theme-actual-color") || LEGACY_ACTUAL_HEX[localStorage.getItem("cf-theme-actual-accent")];
+    if (actualColor) applyCustomColor("--actual", actualColor);
   })();
 </script>
 </head>
@@ -774,6 +775,7 @@
 
 <div class="chart-tooltip" id="chartTooltip"></div>
 <div class="toast" id="toast"></div>
+<div class="cf-selection-bar" id="cfSelectionBar" style="display:none;"></div>
 
 <script>
 (function () {
@@ -800,6 +802,7 @@
   // plus a muted actual sub-row underneath).
   var cashflowAmountMode = "budget";
   var cashflowSectionGapPx = 0;
+  var cashflowZoomPercent = 100;
   var cfColorMenuState = null;
   var monthNotes = {};
   var summarySectionCollapsed = { drawsList: false, yearly: false, drawReport: false, capTable: false };
@@ -2222,6 +2225,7 @@
   function renderTabContent() {
     var el = document.getElementById("tabContent");
     el.innerHTML = "";
+    if (activeTab !== "cashflow") cfClearSelection(null);
     if (previewMode) return renderPrintableReport(el);
     if (activeTab === "cashflow") renderCashflowTab(el);
     else if (activeTab === "timeline") renderTimelineTab(el);
@@ -2284,6 +2288,107 @@
     document.getElementById("cfColorInput").addEventListener("input", function (e) { applyCfColorChoice(e.target.value); });
     document.getElementById("cfColorClearBtn").addEventListener("click", function () { applyCfColorChoice(null); });
     setTimeout(function () { document.addEventListener("click", closeCfColorMenuOnOutsideClick, true); }, 0);
+  }
+
+  // ---------- Cashflow cell selection (Excel-like sum/average/count status bar) ----------
+  // Ranges are expressed in the <table>'s native rowIndex/cellIndex space, so a
+  // rectangular drag/shift-click selection is just a min/max box over those — no need
+  // to track our own grid coordinates alongside the generated HTML.
+  var cfSelection = []; // {r1,c1,r2,c2}[]
+  var cfSelectionAnchor = null; // {r,c} — anchor cell for shift-click / the in-progress drag range
+  var cfSelecting = false;
+  function cfCellCoord(td) { return { r: td.parentElement.rowIndex, c: td.cellIndex }; }
+  function cfNormalizeRange(a, b) { return { r1: Math.min(a.r, b.r), r2: Math.max(a.r, b.r), c1: Math.min(a.c, b.c), c2: Math.max(a.c, b.c) }; }
+  function cfClearSelectionHighlight(table) {
+    table.querySelectorAll(".summary-grid__cell--selected").forEach(function (td) { td.classList.remove("summary-grid__cell--selected"); });
+  }
+  function cfApplySelectionHighlight(table) {
+    cfClearSelectionHighlight(table);
+    var rows = table.rows;
+    cfSelection.forEach(function (range) {
+      for (var r = range.r1; r <= range.r2; r++) {
+        var row = rows[r];
+        if (!row) continue;
+        for (var c = range.c1; c <= range.c2; c++) {
+          var cell = row.cells[c];
+          if (cell && cell.classList.contains("col-money")) cell.classList.add("summary-grid__cell--selected");
+        }
+      }
+    });
+  }
+  // Sums off the rendered $-formatted text itself (not a separate raw-value data
+  // attribute) so it always matches what's on screen, including empty/"—" cells.
+  function cfParseMoneyText(text) {
+    var t = (text || "").trim();
+    if (!t || t === "—") return null;
+    var n = parseFloat(t.replace(/[^0-9.]/g, ""));
+    if (isNaN(n)) return null;
+    return t.indexOf("-") !== -1 ? -n : n;
+  }
+  function cfUpdateSelectionBar(table) {
+    var bar = document.getElementById("cfSelectionBar");
+    var values = [];
+    var seen = {};
+    cfSelection.forEach(function (range) {
+      var rows = table.rows;
+      for (var r = range.r1; r <= range.r2; r++) {
+        var row = rows[r];
+        if (!row) continue;
+        for (var c = range.c1; c <= range.c2; c++) {
+          var key = r + "-" + c;
+          if (seen[key]) continue;
+          seen[key] = true;
+          var cell = row.cells[c];
+          if (!cell || !cell.classList.contains("col-money")) continue;
+          var v = cfParseMoneyText(cell.textContent);
+          if (v != null) values.push(v);
+        }
+      }
+    });
+    if (!values.length) { bar.style.display = "none"; return; }
+    var sum = values.reduce(function (a, b) { return a + b; }, 0);
+    bar.style.display = "flex";
+    bar.innerHTML = "<span>Count<strong>" + values.length + "</strong></span>" +
+      "<span>Average<strong>" + fmtMoney(sum / values.length, true) + "</strong></span>" +
+      "<span>Sum<strong>" + fmtMoney(sum, true) + "</strong></span>";
+  }
+  function cfClearSelection(table) {
+    cfSelection = [];
+    cfSelectionAnchor = null;
+    if (table) cfClearSelectionHighlight(table);
+    var bar = document.getElementById("cfSelectionBar");
+    if (bar) bar.style.display = "none";
+  }
+  function wireCashflowSelection(table) {
+    cfClearSelection(table);
+    table.addEventListener("mousedown", function (e) {
+      var td = e.target.closest("td.col-money");
+      if (!td) return;
+      e.preventDefault();
+      var coord = cfCellCoord(td);
+      if (e.shiftKey && cfSelectionAnchor) {
+        var extended = cfNormalizeRange(cfSelectionAnchor, coord);
+        if (cfSelection.length) cfSelection[cfSelection.length - 1] = extended;
+        else cfSelection.push(extended);
+      } else if (e.ctrlKey || e.metaKey) {
+        cfSelectionAnchor = coord;
+        cfSelection.push(cfNormalizeRange(coord, coord));
+      } else {
+        cfSelectionAnchor = coord;
+        cfSelection = [cfNormalizeRange(coord, coord)];
+      }
+      cfSelecting = true;
+      cfApplySelectionHighlight(table);
+      cfUpdateSelectionBar(table);
+    });
+    table.addEventListener("mousemove", function (e) {
+      if (!cfSelecting || !cfSelectionAnchor || !cfSelection.length) return;
+      var td = e.target.closest("td.col-money");
+      if (!td) return;
+      cfSelection[cfSelection.length - 1] = cfNormalizeRange(cfSelectionAnchor, cfCellCoord(td));
+      cfApplySelectionHighlight(table);
+      cfUpdateSelectionBar(table);
+    });
   }
 
   // A muted, indented sub-row under a budget row showing the same months' actual
@@ -2349,12 +2454,14 @@
               '<option value="both"' + (mode === "both" ? " selected" : "") + ">Both</option>" +
             "</select></label>" +
           '<label class="summary-grid-controls__gap">Section spacing<input type="number" id="cfSectionGap" min="0" max="40" value="' + cashflowSectionGapPx + '" />px</label>' +
+          '<label class="summary-grid-controls__gap">Zoom<input type="range" id="cfZoom" min="70" max="160" step="10" value="' + cashflowZoomPercent + '" /><span id="cfZoomVal">' + cashflowZoomPercent + '%</span></label>' +
           '<span class="summary-grid-controls__gap" style="color:var(--text-muted);">right-click a row or cell to color it</span>';
         tableSection.appendChild(controlsWrap);
       }
 
       var gridWrap = document.createElement("div");
       gridWrap.className = "summary-grid-wrap";
+      gridWrap.style.setProperty("--cf-zoom", String(cashflowZoomPercent / 100));
       var html = '<table class="summary-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money summary-grid__budget">' + (mode === "actual" ? "Actual" : "Budget") + "</th>";
       summary.months.forEach(function (m, i) { html += '<th class="col-money' + colClass(m) + '"><span class="summary-grid__monthnum">Month ' + (i + 1) + '</span><span class="summary-grid__monthlabel">' + fmtMonth(m) + "</span></th>"; });
       html += "</tr></thead><tbody>";
@@ -2469,6 +2576,8 @@
     }
 
     if (!forcePrint) {
+      var cfTable = wrap.querySelector("table.summary-grid");
+      if (cfTable) wireCashflowSelection(cfTable);
       var chartBtn = wrap.querySelector("#chartCollapseBtn");
       if (chartBtn) chartBtn.addEventListener("click", function () { chartCollapsed = !chartCollapsed; render(); });
       var highlightBtn = wrap.querySelector("#highlightMonthBtn");
@@ -2481,6 +2590,16 @@
       if (gapInput) gapInput.addEventListener("change", function () {
         cashflowSectionGapPx = Math.max(0, Math.min(40, Number(gapInput.value) || 0));
         render();
+      });
+      // Live-updates a CSS custom property directly (no render()) so dragging the
+      // slider stays smooth even on a large grid — matches the Timeline tab's size sliders.
+      var zoomInput = wrap.querySelector("#cfZoom");
+      if (zoomInput) zoomInput.addEventListener("input", function () {
+        cashflowZoomPercent = Number(zoomInput.value);
+        var zoomVal = wrap.querySelector("#cfZoomVal");
+        if (zoomVal) zoomVal.textContent = cashflowZoomPercent + "%";
+        var gw = wrap.querySelector(".summary-grid-wrap");
+        if (gw) gw.style.setProperty("--cf-zoom", String(cashflowZoomPercent / 100));
       });
       wrap.querySelectorAll("[data-color-row]").forEach(function (td) {
         td.addEventListener("contextmenu", function (e) {
@@ -4530,50 +4649,108 @@
 
   // ---------- theme picker ----------
   var THEME_MODES = [["system", "System"], ["light", "Light"], ["dark", "Dark"]];
-  var THEME_ACCENTS = ["blue", "green", "purple", "orange", "rose", "black"];
-  var THEME_ACTUAL_ACCENTS = ["teal", "green", "blue", "purple", "amber", "rose"];
+  var LEGACY_ACCENT_HEX = { blue: "#2a78d6", green: "#2e9e5b", purple: "#7c5cff", orange: "#c8720a", rose: "#c23b6b", black: "#1a1a1a" };
+  var LEGACY_ACTUAL_HEX = { teal: "#0a8f6b", green: "#2e9e5b", blue: "#2a78d6", purple: "#7c5cff", amber: "#c8720a", rose: "#c23b6b" };
+  var DEFAULT_ACCENT_HEX = "#2a78d6";
+  var DEFAULT_ACTUAL_HEX = "#0a8f6b";
   function getThemeMode() { return localStorage.getItem("cf-theme-mode") || "system"; }
-  function getThemeAccent() { return localStorage.getItem("cf-theme-accent") || "blue"; }
-  function getThemeActualAccent() { return localStorage.getItem("cf-theme-actual-accent") || "teal"; }
+  function hexToRgb(hex) {
+    var h = hex.replace("#", "");
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    var num = parseInt(h, 16);
+    return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+  }
+  function isThemeDarkEffective() {
+    var attr = document.documentElement.getAttribute("data-theme");
+    if (attr === "dark") return true;
+    if (attr === "light") return false;
+    return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  }
+  // Migrates the old swatch-picker's preset-name localStorage key (if present and
+  // no custom-color key has been set yet) into the new hex-based key, once.
+  function migrateLegacyColorKey(newKey, oldKey, presetMap) {
+    if (localStorage.getItem(newKey)) return;
+    var legacy = localStorage.getItem(oldKey);
+    if (legacy && presetMap[legacy]) localStorage.setItem(newKey, presetMap[legacy]);
+    if (legacy) localStorage.removeItem(oldKey);
+  }
+  function getThemeAccentColor() {
+    migrateLegacyColorKey("cf-theme-accent-color", "cf-theme-accent", LEGACY_ACCENT_HEX);
+    return localStorage.getItem("cf-theme-accent-color");
+  }
+  function getThemeActualColor() {
+    migrateLegacyColorKey("cf-theme-actual-color", "cf-theme-actual-accent", LEGACY_ACTUAL_HEX);
+    return localStorage.getItem("cf-theme-actual-color");
+  }
+  function applyCustomColor(varName, hex) {
+    document.documentElement.style.setProperty(varName, hex);
+    var rgb = hexToRgb(hex);
+    document.documentElement.style.setProperty(varName + "-bg", "rgba(" + rgb.join(",") + "," + (isThemeDarkEffective() ? 0.15 : 0.1) + ")");
+  }
+  function clearCustomColor(varName) {
+    document.documentElement.style.removeProperty(varName);
+    document.documentElement.style.removeProperty(varName + "-bg");
+  }
+  function refreshCustomColors() {
+    var accent = getThemeAccentColor();
+    if (accent) applyCustomColor("--accent", accent);
+    var actual = getThemeActualColor();
+    if (actual) applyCustomColor("--actual", actual);
+  }
   function setThemeMode(mode) {
     localStorage.setItem("cf-theme-mode", mode);
     if (mode === "system") document.documentElement.removeAttribute("data-theme");
     else document.documentElement.setAttribute("data-theme", mode);
+    refreshCustomColors();
   }
-  function setThemeAccent(accent) {
-    localStorage.setItem("cf-theme-accent", accent);
-    document.documentElement.setAttribute("data-accent", accent);
+  function setThemeAccentColor(hex) {
+    localStorage.setItem("cf-theme-accent-color", hex);
+    applyCustomColor("--accent", hex);
   }
-  function setThemeActualAccent(accent) {
-    localStorage.setItem("cf-theme-actual-accent", accent);
-    document.documentElement.setAttribute("data-actual-accent", accent);
+  function setThemeActualColor(hex) {
+    localStorage.setItem("cf-theme-actual-color", hex);
+    applyCustomColor("--actual", hex);
+  }
+  function resetThemeAccentColor() {
+    localStorage.removeItem("cf-theme-accent-color");
+    clearCustomColor("--accent");
+  }
+  function resetThemeActualColor() {
+    localStorage.removeItem("cf-theme-actual-color");
+    clearCustomColor("--actual");
+  }
+  if (window.matchMedia) {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+      if (getThemeMode() === "system") refreshCustomColors();
+    });
   }
   function renderThemePanel() {
     var panel = document.getElementById("themePickerPanel");
-    var mode = getThemeMode(), accent = getThemeAccent(), actualAccent = getThemeActualAccent();
+    var mode = getThemeMode();
+    var accent = getThemeAccentColor(), actualColor = getThemeActualColor();
     var html = '<p class="theme-picker__title">Mode</p><div class="theme-picker__modes">';
     THEME_MODES.forEach(function (m) {
       html += '<button class="theme-picker__mode-btn' + (mode === m[0] ? " theme-picker__mode-btn--active" : "") + '" data-mode="' + m[0] + '">' + m[1] + "</button>";
     });
-    html += '</div><p class="theme-picker__title">Accent color</p><div class="theme-picker__accents">';
-    THEME_ACCENTS.forEach(function (a) {
-      html += '<button class="theme-picker__swatch theme-picker__swatch--' + a + (accent === a ? " theme-picker__swatch--active" : "") + '" data-accent="' + a + '" aria-label="' + a + '" title="' + a + '"></button>';
-    });
-    html += '</div><p class="theme-picker__title">Actuals color</p><div class="theme-picker__accents">';
-    THEME_ACTUAL_ACCENTS.forEach(function (a) {
-      html += '<button class="theme-picker__swatch theme-picker__swatch--' + a + (actualAccent === a ? " theme-picker__swatch--active" : "") + '" data-actual-accent="' + a + '" aria-label="' + a + '" title="' + a + '"></button>';
-    });
-    html += "</div>";
+    html += '</div><p class="theme-picker__title">Accent color</p><div class="theme-picker__color-row">' +
+      '<input type="color" id="accentColorInput" value="' + (accent || DEFAULT_ACCENT_HEX) + '" />' +
+      (accent ? '<button class="theme-picker__color-reset" id="accentColorReset">Reset</button>' : "") +
+      '</div><p class="theme-picker__title">Actuals color</p><div class="theme-picker__color-row">' +
+      '<input type="color" id="actualColorInput" value="' + (actualColor || DEFAULT_ACTUAL_HEX) + '" />' +
+      (actualColor ? '<button class="theme-picker__color-reset" id="actualColorReset">Reset</button>' : "") +
+      "</div>";
     panel.innerHTML = html;
     panel.querySelectorAll("[data-mode]").forEach(function (btn) {
       btn.addEventListener("click", function () { setThemeMode(btn.getAttribute("data-mode")); renderThemePanel(); });
     });
-    panel.querySelectorAll("[data-accent]").forEach(function (btn) {
-      btn.addEventListener("click", function () { setThemeAccent(btn.getAttribute("data-accent")); renderThemePanel(); });
-    });
-    panel.querySelectorAll("[data-actual-accent]").forEach(function (btn) {
-      btn.addEventListener("click", function () { setThemeActualAccent(btn.getAttribute("data-actual-accent")); renderThemePanel(); });
-    });
+    panel.querySelector("#accentColorInput").addEventListener("input", function (e) { setThemeAccentColor(e.target.value); });
+    panel.querySelector("#accentColorInput").addEventListener("change", function () { renderThemePanel(); });
+    panel.querySelector("#actualColorInput").addEventListener("input", function (e) { setThemeActualColor(e.target.value); });
+    panel.querySelector("#actualColorInput").addEventListener("change", function () { renderThemePanel(); });
+    var accentReset = panel.querySelector("#accentColorReset");
+    if (accentReset) accentReset.addEventListener("click", function () { resetThemeAccentColor(); renderThemePanel(); });
+    var actualReset = panel.querySelector("#actualColorReset");
+    if (actualReset) actualReset.addEventListener("click", function () { resetThemeActualColor(); renderThemePanel(); });
   }
   document.getElementById("themePickerBtn").addEventListener("click", function () {
     var panel = document.getElementById("themePickerPanel");
@@ -4627,6 +4804,12 @@
     if (!isDirty) return;
     e.preventDefault();
     e.returnValue = "";
+  });
+
+  // ---------- cashflow cell selection (global listeners, wired once) ----------
+  document.addEventListener("mouseup", function () { cfSelecting = false; });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && cfSelection.length) cfClearSelection(document.querySelector("table.summary-grid"));
   });
 
   // ---------- print ----------
