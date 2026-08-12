@@ -597,6 +597,7 @@
     <div class="print-preview-bar__row">
       <span class="print-preview-bar__label">Print Preview</span>
       <button id="ppSettingsToggleBtn" type="button">▾ Settings</button>
+      <button id="ppPdfBtn" type="button">Export PDF</button>
       <button id="ppPrintBtn" type="button">Print</button>
       <button id="ppExitBtn" type="button">Exit preview</button>
     </div>
@@ -2717,6 +2718,300 @@
     wrap.style.width = "";
   }
 
+  // ================= PDF export =================
+  // Writes a PDF by hand rather than pulling in a library: this page ships as one
+  // self-contained file with no build step, and a bundled renderer would dwarf it.
+  // Layout isn't reimplemented — the print preview has already paginated everything,
+  // so this reads each laid-out page's final geometry straight off the DOM and emits
+  // the handful of primitives the report actually uses: filled (optionally rounded)
+  // rectangles and text. Output stays vector, small, and selectable.
+  var PDF_PT_PER_PX = 72 / 96;
+  // Adobe base-14 advance widths, 1/1000 em, for printable ASCII (32..126). Only used
+  // to size text; any residual mismatch against the browser's font is absorbed by
+  // horizontal scaling so a run still occupies exactly the width it did on screen.
+  var PDF_W_REGULAR = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584];
+  var PDF_W_BOLD = [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584];
+
+  // WinAnsi has no glyph for most of the UI's symbols; map what has an equivalent and
+  // drop the rest rather than emitting mojibake.
+  // Values are WinAnsi code points, written as escapes so the source stays ASCII-safe.
+  var PDF_CHAR_MAP = { "–": "", "—": "", "‘": "", "’": "",
+    "“": "", "”": "", "•": "", "…": "", "×": "×",
+    "≠": "!=", "→": "->", "≤": "<=", "≥": ">=" };
+
+  function pdfEncodeText(s) {
+    var out = "";
+    for (var i = 0; i < s.length; i++) {
+      var ch = s[i];
+      var code = s.charCodeAt(i);
+      if (code >= 32 && code <= 126) { out += ch; continue; }
+      if (PDF_CHAR_MAP[ch] !== undefined) { out += PDF_CHAR_MAP[ch]; continue; }
+      if (code >= 160 && code <= 255) { out += ch; continue; }
+      // Anything else (chevrons, arrows, check boxes) simply isn't representable.
+    }
+    return out;
+  }
+
+  function pdfEscapeString(s) {
+    var out = "";
+    for (var i = 0; i < s.length; i++) {
+      var c = s[i], code = s.charCodeAt(i);
+      if (c === "\\" || c === "(" || c === ")") out += "\\" + c;
+      else if (code > 126) out += "\\" + ("000" + code.toString(8)).slice(-3);
+      else out += c;
+    }
+    return out;
+  }
+
+  function pdfTextWidth(s, size, bold) {
+    var table = bold ? PDF_W_BOLD : PDF_W_REGULAR;
+    var total = 0;
+    for (var i = 0; i < s.length; i++) {
+      var code = s.charCodeAt(i);
+      total += (code >= 32 && code <= 126) ? table[code - 32] : 556;
+    }
+    return (total / 1000) * size;
+  }
+
+  function pdfParseColor(v) {
+    if (!v) return null;
+    v = String(v).trim();
+    if (v === "transparent" || v === "none") return null;
+    var m = v.match(/^rgba?\(([^)]+)\)$/);
+    if (m) {
+      var p = m[1].split(/[,\/\s]+/).filter(function (x) { return x !== ""; }).map(parseFloat);
+      if (p.length < 3 || p.some(isNaN)) return null;
+      return { r: p[0] / 255, g: p[1] / 255, b: p[2] / 255, a: p.length > 3 ? p[3] : 1 };
+    }
+    m = v.match(/^color\(srgb\s+([^)]+)\)$/);
+    if (m) {
+      var q = m[1].split(/[\/\s]+/).filter(function (x) { return x !== ""; }).map(parseFloat);
+      if (q.length < 3 || q.some(isNaN)) return null;
+      return { r: q[0], g: q[1], b: q[2], a: q.length > 3 ? q[3] : 1 };
+    }
+    return null;
+  }
+
+  // Pages are white, so translucent fills (the timeline's pills are alpha ramps)
+  // can be flattened against white instead of needing a transparency group.
+  function pdfRgb(c) {
+    var a = c.a == null ? 1 : c.a;
+    function ch(v) { return Math.max(0, Math.min(1, v * a + (1 - a))).toFixed(4); }
+    return ch(c.r) + " " + ch(c.g) + " " + ch(c.b) + " rg";
+  }
+
+  function pdfNum(n) { return (Math.round(n * 100) / 100).toString(); }
+
+  function pdfRectPath(x, y, w, h, radius) {
+    var r = Math.min(radius || 0, w / 2, h / 2);
+    if (r <= 0.3) return pdfNum(x) + " " + pdfNum(y - h) + " " + pdfNum(w) + " " + pdfNum(h) + " re";
+    var k = r * 0.5523;
+    var x0 = x, x1 = x + w, y0 = y, y1 = y - h;
+    return [
+      pdfNum(x0 + r) + " " + pdfNum(y0) + " m",
+      pdfNum(x1 - r) + " " + pdfNum(y0) + " l",
+      pdfNum(x1 - r + k) + " " + pdfNum(y0) + " " + pdfNum(x1) + " " + pdfNum(y0 - r + k) + " " + pdfNum(x1) + " " + pdfNum(y0 - r) + " c",
+      pdfNum(x1) + " " + pdfNum(y1 + r) + " l",
+      pdfNum(x1) + " " + pdfNum(y1 + r - k) + " " + pdfNum(x1 - r + k) + " " + pdfNum(y1) + " " + pdfNum(x1 - r) + " " + pdfNum(y1) + " c",
+      pdfNum(x0 + r) + " " + pdfNum(y1) + " l",
+      pdfNum(x0 + r - k) + " " + pdfNum(y1) + " " + pdfNum(x0) + " " + pdfNum(y1 + r - k) + " " + pdfNum(x0) + " " + pdfNum(y1 + r) + " c",
+      pdfNum(x0) + " " + pdfNum(y0 - r) + " l",
+      pdfNum(x0) + " " + pdfNum(y0 - r + k) + " " + pdfNum(x0 + r - k) + " " + pdfNum(y0) + " " + pdfNum(x0 + r) + " " + pdfNum(y0) + " c",
+      "h",
+    ].join(" ");
+  }
+
+  function pdfPageStream(pageEl, pageHeightPx) {
+    var origin = pageEl.getBoundingClientRect();
+    var ops = [];
+    var H = pageHeightPx * PDF_PT_PER_PX;
+    function toX(px) { return px * PDF_PT_PER_PX; }
+    function toY(px) { return H - px * PDF_PT_PER_PX; }
+
+    function fill(colour, x, y, w, h, radius) {
+      if (!colour || (colour.a != null && colour.a < 0.02) || w <= 0 || h <= 0) return;
+      ops.push("q " + pdfRgb(colour) + " " +
+        pdfRectPath(toX(x), toY(y), toX(w), toY(0) - toY(h), radius ? toX(radius) : 0) + " f Q");
+    }
+
+    function drawText(str, rect, size, bold, colour) {
+      var encoded = pdfEncodeText(str);
+      if (!encoded.trim()) return;
+      var natural = pdfTextWidth(encoded, size, bold);
+      if (natural <= 0) return;
+      // Match the on-screen run width exactly, so right-aligned figures stay aligned
+      // even though Helvetica's metrics differ from the browser's UI font.
+      var scale = rect.width > 0 ? Math.max(50, Math.min(200, (rect.width / natural) * 100)) : 100;
+      var ascent = 0.718 * size, descent = 0.207 * size;
+      var baseline = rect.top - origin.top + (rect.height - (ascent + descent)) / 2 + ascent;
+      ops.push("BT " + pdfRgb(colour) + " /" + (bold ? "F2" : "F1") + " " + pdfNum(size * PDF_PT_PER_PX) + " Tf " +
+        pdfNum(scale) + " Tz " +
+        pdfNum(toX(rect.left - origin.left)) + " " + pdfNum(toY(baseline)) + " Td (" +
+        pdfEscapeString(encoded) + ") Tj ET");
+    }
+
+    function emitTextNodes(el, cs) {
+      var size = parseFloat(cs.fontSize) || 12;
+      var bold = (parseInt(cs.fontWeight, 10) || 400) >= 600;
+      var isSvg = el.namespaceURI === "http://www.w3.org/2000/svg";
+      var colour = pdfParseColor(isSvg ? cs.fill : cs.color) || { r: 0, g: 0, b: 0, a: 1 };
+      Array.prototype.forEach.call(el.childNodes, function (node) {
+        if (node.nodeType !== 3) return;
+        var text = node.nodeValue.replace(/\s+/g, " ");
+        if (!text.trim()) return;
+        var range = document.createRange();
+        range.selectNodeContents(node);
+        var rects = Array.prototype.slice.call(range.getClientRects())
+          .filter(function (r) { return r.width > 0.5 && r.height > 0.5; });
+        if (rects.length === 0) return;
+        if (rects.length === 1) { drawText(text, rects[0], size, bold, colour); return; }
+        // Wrapped run: hand words to each line box until it is full.
+        var words = text.trim().split(" ");
+        var w = 0;
+        rects.forEach(function (r, i) {
+          var line = [];
+          var used = 0;
+          while (w < words.length) {
+            var candidate = pdfTextWidth(pdfEncodeText((line.concat([words[w]])).join(" ")), size, bold);
+            if (line.length && candidate > r.width && i < rects.length - 1) break;
+            line.push(words[w++]);
+            used = candidate;
+          }
+          if (line.length) drawText(line.join(" "), r, size, bold, colour);
+        });
+      });
+    }
+
+    (function walk(el) {
+      var cs = window.getComputedStyle(el);
+      if (cs.display === "none" || cs.visibility === "hidden" || parseFloat(cs.opacity) === 0) return;
+      if (el.classList && el.classList.contains("print-page__label")) return;
+      var r = el.getBoundingClientRect();
+      var x = r.left - origin.left, y = r.top - origin.top;
+      var isSvg = el.namespaceURI === "http://www.w3.org/2000/svg";
+
+      if (r.width > 0 && r.height > 0) {
+        if (isSvg && el.tagName.toLowerCase() !== "svg" && el.tagName.toLowerCase() !== "text") {
+          // SVG chart primitives: bars paint with fill, gridlines with stroke.
+          var svgPaint = pdfParseColor(cs.fill) || pdfParseColor(cs.stroke);
+          var rx = parseFloat(el.getAttribute("rx")) || 0;
+          fill(svgPaint, x, y, r.width, Math.max(r.height, 0.5), rx);
+        } else if (!isSvg) {
+          fill(pdfParseColor(cs.backgroundColor), x, y, r.width, r.height, parseFloat(cs.borderTopLeftRadius) || 0);
+          [["Top", x, y, r.width, parseFloat(cs.borderTopWidth) || 0],
+           ["Bottom", x, y + r.height - (parseFloat(cs.borderBottomWidth) || 0), r.width, parseFloat(cs.borderBottomWidth) || 0],
+           ["Left", x, y, parseFloat(cs.borderLeftWidth) || 0, r.height],
+           ["Right", x + r.width - (parseFloat(cs.borderRightWidth) || 0), y, parseFloat(cs.borderRightWidth) || 0, r.height]
+          ].forEach(function (b) {
+            if (b[3] <= 0 || b[4] <= 0) return;
+            if (cs["border" + b[0] + "Style"] === "none") return;
+            fill(pdfParseColor(cs["border" + b[0] + "Color"]), b[1], b[2], b[3], b[4], 0);
+          });
+        }
+      }
+      emitTextNodes(el, cs);
+      Array.prototype.forEach.call(el.children, walk);
+    })(pageEl);
+
+    return ops.join("\n");
+  }
+
+  function pdfChrome(pageIndex, pageCount, dims) {
+    var H = dims.pageHeightPx * PDF_PT_PER_PX;
+    var grey = { r: 0.35, g: 0.35, b: 0.35, a: 1 };
+    var ops = [];
+    function label(str, xPt, yPt, size, bold, align, widthPt) {
+      var encoded = pdfEncodeText(str);
+      if (!encoded.trim()) return;
+      var w = pdfTextWidth(encoded, size, bold);
+      var x = align === "right" ? xPt + widthPt - w : xPt;
+      ops.push("BT " + pdfRgb(grey) + " /" + (bold ? "F2" : "F1") + " " + pdfNum(size) + " Tf 100 Tz " +
+        pdfNum(x) + " " + pdfNum(yPt) + " Td (" + pdfEscapeString(encoded) + ") Tj ET");
+    }
+    var left = dims.marginLeftPx * PDF_PT_PER_PX;
+    var right = (dims.pageWidthPx - dims.marginRightPx) * PDF_PT_PER_PX;
+    var topY = H - (dims.marginTopPx * PDF_PT_PER_PX) + 6;
+    var botY = (dims.marginBottomPx * PDF_PT_PER_PX) - 12;
+    label(project ? project.name : "", left, topY, 9, true, "left", 0);
+    label("Generated " + (printGeneratedAt ? printGeneratedAt.toLocaleString() : ""), left, botY, 8, false, "left", 0);
+    label("Page " + (pageIndex + 1) + " of " + pageCount, left, botY, 8, false, "right", right - left);
+    return ops.join("\n");
+  }
+
+  function buildPdfBlob(streams, dims) {
+    var wPt = pdfNum(dims.pageWidthPx * PDF_PT_PER_PX);
+    var hPt = pdfNum(dims.pageHeightPx * PDF_PT_PER_PX);
+    var objs = [];
+    function add(body) { objs.push(body); return objs.length; }
+    var fontRegular = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+    var fontBold = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+    var pagesId = add("");
+    var kids = [];
+    streams.forEach(function (stream) {
+      var contentId = add("<< /Length " + stream.length + " >>\nstream\n" + stream + "\nendstream");
+      kids.push(add("<< /Type /Page /Parent " + pagesId + " 0 R /MediaBox [0 0 " + wPt + " " + hPt + "]" +
+        " /Resources << /Font << /F1 " + fontRegular + " 0 R /F2 " + fontBold + " 0 R >> >>" +
+        " /Contents " + contentId + " 0 R >>") + " 0 R");
+    });
+    objs[pagesId - 1] = "<< /Type /Pages /Count " + kids.length + " /Kids [" + kids.join(" ") + "] >>";
+    var catalogId = add("<< /Type /Catalog /Pages " + pagesId + " 0 R >>");
+
+    var out = "%PDF-1.4\n";
+    var offsets = [];
+    objs.forEach(function (body, i) {
+      offsets.push(out.length);
+      out += (i + 1) + " 0 obj\n" + body + "\nendobj\n";
+    });
+    var xref = out.length;
+    out += "xref\n0 " + (objs.length + 1) + "\n0000000000 65535 f \n";
+    offsets.forEach(function (off) { out += ("0000000000" + off).slice(-10) + " 00000 n \n"; });
+    out += "trailer\n<< /Size " + (objs.length + 1) + " /Root " + catalogId + " 0 R >>\nstartxref\n" + xref + "\n%%EOF";
+
+    var bytes = new Uint8Array(out.length);
+    for (var i = 0; i < out.length; i++) bytes[i] = out.charCodeAt(i) & 0xff;
+    return new Blob([bytes], { type: "application/pdf" });
+  }
+
+  function exportPdf() {
+    if (!previewMode) { showToast("Open Print Preview first"); return; }
+    var pages = Array.prototype.slice.call(document.querySelectorAll(".print-page"));
+    if (!pages.length) { showToast("Nothing to export"); return; }
+    showToast("Building PDF…");
+    // Geometry is read straight from the DOM, so the preview has to be at 1:1 or every
+    // measurement comes back multiplied by the zoom.
+    var prevZoom = printZoom, prevAuto = printZoomAuto;
+    printZoomAuto = false;
+    printZoom = 100;
+    render();
+
+    setTimeout(function () {
+      try {
+        var dims = pageDimensionsPx(printSettings);
+        var live = Array.prototype.slice.call(document.querySelectorAll(".print-page"));
+        var streams = live.map(function (pageEl, i) {
+          return pdfPageStream(pageEl, dims.pageHeightPx) + "\n" + pdfChrome(i, live.length, dims);
+        });
+        var blob = buildPdfBlob(streams, dims);
+        var name = ((project && project.name) || "cashflow").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-");
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = (name || "cashflow") + ".pdf";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+        showToast(live.length + " page" + (live.length === 1 ? "" : "s") + " exported");
+      } catch (err) {
+        showToast("PDF export failed: " + err.message);
+      } finally {
+        printZoom = prevZoom;
+        printZoomAuto = prevAuto;
+        render();
+      }
+    }, 60);
+  }
+
   var CASHFLOW_SECTION_KEYS = { cashflowGraph: 1, cashflowTable: 1, cashflowTimeline: 1 };
 
   // Builds one section in isolation so renderPrintableReport can emit them in any
@@ -4167,6 +4462,7 @@
   document.getElementById("ppPrintBtn").addEventListener("click", function () {
     window.print();
   });
+  document.getElementById("ppPdfBtn").addEventListener("click", function () { exportPdf(); });
   function togglePrintSettingsPanel(collapsed) {
     printSettingsPanelCollapsed = collapsed;
     updateSettingsPanelToggle();
