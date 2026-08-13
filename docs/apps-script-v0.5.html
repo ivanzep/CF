@@ -249,6 +249,9 @@
   .summary-grid__notes td { background: var(--surface); border-bottom: 2px solid var(--border-strong); }
   .summary-grid__notenote { width: 100%; min-width: 90px; border: 1px solid transparent; background: transparent; color: var(--text-secondary); font-size: calc(11px * var(--cf-zoom, 1)); font-style: italic; padding: 3px 4px; border-radius: 4px; }
   .summary-grid__notenote:hover, .summary-grid__notenote:focus { border-color: var(--border); font-style: normal; outline: none; }
+  /* Deliberately not .col-money — these aren't monetary values, and giving them that
+     class would make them selectable/summable by the Excel-like cell-selection feature. */
+  .summary-grid__rangecol { text-align: right; color: var(--text-muted); font-size: 0.92em; white-space: nowrap; }
 
   .cashflow-chart { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
   .cashflow-chart h3 { margin: 0; font-size: 14px; color: var(--text-secondary); }
@@ -842,6 +845,7 @@
   var cashflowAmountMode = "budget";
   var cashflowSectionGapPx = 0;
   var cashflowZoomPercent = 100;
+  var cashflowShowScheduleRange = true;
   var cfColorMenuState = null;
   var monthNotes = {};
   var summarySectionCollapsed = { drawsList: false, yearly: false, drawReport: false, capTable: false };
@@ -2430,6 +2434,30 @@
     });
   }
 
+  // Starting/ending month and month-count span for a row's monthly schedule, derived
+  // from the first/last month with a nonzero amount — no separate stored field, since
+  // the monthly map is already the source of truth for where a schedule lands.
+  function scheduleRangeOf(monthly) {
+    if (!monthly) return null;
+    var keys = Object.keys(monthly).filter(function (m) { return monthly[m]; }).sort();
+    if (!keys.length) return null;
+    var start = keys[0], end = keys[keys.length - 1];
+    var sy = Number(start.slice(0, 4)), sm = Number(start.slice(5, 7));
+    var ey = Number(end.slice(0, 4)), em = Number(end.slice(5, 7));
+    return { start: start, end: end, duration: (ey - sy) * 12 + (em - sm) + 1 };
+  }
+  // monthly === null renders three blank cells (for rows with no single schedule of
+  // their own, e.g. the category header/Notes rows) rather than a "—" placeholder,
+  // matching how those rows already render blank (not dashed) month cells.
+  function rangeCellsHtml(monthly) {
+    if (!cashflowShowScheduleRange) return "";
+    if (!monthly) return '<td class="summary-grid__rangecol"></td><td class="summary-grid__rangecol"></td><td class="summary-grid__rangecol"></td>';
+    var r = scheduleRangeOf(monthly);
+    return '<td class="summary-grid__rangecol">' + (r ? fmtMonth(r.start) : "—") + "</td>" +
+      '<td class="summary-grid__rangecol">' + (r ? r.duration : "—") + "</td>" +
+      '<td class="summary-grid__rangecol">' + (r ? fmtMonth(r.end) : "—") + "</td>";
+  }
+
   // A muted, indented sub-row under a budget row showing the same months' actual
   // spend, so the two are compared by simply reading down one column at a time.
   function actualRowHtml(label, actualMonthly, actualTotal, budgetTotal, months, colClassFn) {
@@ -2439,6 +2467,7 @@
       : "";
     var html = '<tr class="summary-grid__actual"><td class="summary-grid__label summary-grid__actual-label">' + label + "</td>";
     html += '<td class="col-money summary-grid__budget" title="Actual total' + esc(deltaTitle) + '">' + (actualTotal ? fmtMoney(actualTotal) : "") + "</td>";
+    html += rangeCellsHtml(actualMonthly);
     months.forEach(function (m) {
       html += '<td class="col-money' + colClassFn(m) + '">' + (actualMonthly[m] ? fmtMoney(actualMonthly[m]) : "") + "</td>";
     });
@@ -2486,6 +2515,7 @@
         controlsWrap.className = "summary-grid-controls";
         controlsWrap.innerHTML = '<button class="link-button" id="highlightMonthBtn">' + (highlightCurrentMonth ? "☑" : "☐") + " highlight current month</button>" +
           '<button class="link-button" id="cfFullWidthBtn">' + (cashflowFullWidth ? "☑" : "☐") + " full width table</button>" +
+          '<button class="link-button" id="cfShowRangeBtn">' + (cashflowShowScheduleRange ? "☑" : "☐") + " show schedule range</button>" +
           '<label class="summary-grid-controls__gap" style="color:var(--actual);">Amounts' +
             '<select id="cfAmountMode">' +
               '<option value="budget"' + (mode === "budget" ? " selected" : "") + ">Budget</option>" +
@@ -2502,15 +2532,16 @@
       gridWrap.className = "summary-grid-wrap";
       gridWrap.style.setProperty("--cf-zoom", String(cashflowZoomPercent / 100));
       var html = '<table class="summary-grid"><thead><tr><th class="summary-grid__label">Line item</th><th class="col-money summary-grid__budget">' + (mode === "actual" ? "Actual" : "Budget") + "</th>";
+      if (cashflowShowScheduleRange) html += '<th class="summary-grid__rangecol">Start</th><th class="summary-grid__rangecol">Duration</th><th class="summary-grid__rangecol">End</th>';
       summary.months.forEach(function (m, i) { html += '<th class="col-money' + colClass(m) + '"><span class="summary-grid__monthnum">Month ' + (i + 1) + '</span><span class="summary-grid__monthlabel">' + fmtMonth(m) + "</span></th>"; });
       html += "</tr></thead><tbody>";
-      html += '<tr class="summary-grid__notes"><td class="summary-grid__label">Notes</td><td class="summary-grid__budget"></td>';
+      html += '<tr class="summary-grid__notes"><td class="summary-grid__label">Notes</td><td class="summary-grid__budget"></td>' + rangeCellsHtml(null);
       summary.months.forEach(function (m) {
         html += '<td' + (colClass(m) ? ' class="' + colClass(m).trim() + '"' : "") + '><input class="summary-grid__notenote" data-note-month="' + m + '" value="' + esc(monthNotes[m] || "") + '" placeholder="—" /></td>';
       });
       html += "</tr>";
       summary.categories.forEach(function (cat) {
-        html += '<tr class="summary-grid__category"><td class="summary-grid__label">' + esc(cat.name) + '</td><td class="summary-grid__budget"></td>';
+        html += '<tr class="summary-grid__category"><td class="summary-grid__label">' + esc(cat.name) + '</td><td class="summary-grid__budget"></td>' + rangeCellsHtml(null);
         summary.months.forEach(function (m) { html += '<td class="' + ("col-money" + colClass(m)) + '"></td>'; });
         html += "</tr>";
         cat.lineItems.forEach(function (li) {
@@ -2524,6 +2555,7 @@
             html += "<tr>";
             html += "<td " + coloredTdAttrs("summary-grid__label", li.color) + rowColorAttr + ">" + toggle + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
             html += "<td " + coloredTdAttrs("col-money summary-grid__budget", li.color) + rowColorAttr + ">" + fmtMoney(li.totalBudget) + "</td>";
+            html += rangeCellsHtml(li.monthly);
             summary.months.forEach(function (m) {
               var cellColor = getCellColor(li.id, m) || li.color;
               var cellAttr = !forcePrint ? ' data-color-cell="' + li.id + "|" + m + '"' : "";
@@ -2537,6 +2569,7 @@
             html += "<tr>";
             html += "<td " + coloredTdAttrs("summary-grid__label", li.color) + rowColorAttr + ">" + toggle + (li.code ? '<span class="summary-grid__code">' + esc(li.code) + "</span>" : "") + esc(li.description) + "</td>";
             html += "<td " + coloredTdAttrs("col-money summary-grid__budget", li.color) + rowColorAttr + ">" + (li.actualTotal ? fmtMoney(li.actualTotal) : "") + "</td>";
+            html += rangeCellsHtml(li.actualMonthly);
             summary.months.forEach(function (m) {
               var cellColor = getCellColor(li.id, m) || li.color;
               var cellAttr = !forcePrint ? ' data-color-cell="' + li.id + "|" + m + '"' : "";
@@ -2549,6 +2582,7 @@
               if (mode !== "actual") {
                 html += '<tr class="summary-grid__budgetline"><td class="summary-grid__label summary-grid__budgetline-desc">' + esc(bi.description) + "</td>";
                 html += '<td class="col-money summary-grid__budget">' + fmtMoney(bi.totalBudget) + "</td>";
+                html += rangeCellsHtml(bi.monthly);
                 summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (bi.monthly[m] ? fmtMoney(bi.monthly[m]) : "") + "</td>"; });
                 html += "</tr>";
               }
@@ -2557,6 +2591,7 @@
               } else if (mode === "actual") {
                 html += '<tr class="summary-grid__budgetline"><td class="summary-grid__label summary-grid__budgetline-desc">' + esc(bi.description) + "</td>";
                 html += '<td class="col-money summary-grid__budget">' + (bi.actualTotal ? fmtMoney(bi.actualTotal) : "") + "</td>";
+                html += rangeCellsHtml(bi.actualMonthly);
                 summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (bi.actualMonthly[m] ? fmtMoney(bi.actualMonthly[m]) : "") + "</td>"; });
                 html += "</tr>";
               }
@@ -2565,6 +2600,7 @@
         });
         if (mode !== "actual") {
           html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money summary-grid__budget\">" + fmtMoney(cat.subtotalTotal) + "</td>";
+          html += rangeCellsHtml(cat.subtotal);
           summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (cat.subtotal[m] ? fmtMoney(cat.subtotal[m]) : "") + "</td>"; });
           html += "</tr>";
         }
@@ -2572,12 +2608,14 @@
           html += actualRowHtml("Actual — Total " + esc(cat.name), cat.actualSubtotal, cat.actualSubtotalTotal, cat.subtotalTotal, summary.months, colClass);
         } else if (mode === "actual") {
           html += '<tr class="summary-grid__subtotal"><td class="summary-grid__label">Total ' + esc(cat.name) + "</td><td class=\"col-money summary-grid__budget\">" + (cat.actualSubtotalTotal ? fmtMoney(cat.actualSubtotalTotal) : "") + "</td>";
+          html += rangeCellsHtml(cat.actualSubtotal);
           summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (cat.actualSubtotal[m] ? fmtMoney(cat.actualSubtotal[m]) : "") + "</td>"; });
           html += "</tr>";
         }
       });
       if (mode !== "actual") {
         html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money summary-grid__budget">' + fmtMoney(summary.grandTotal.total) + "</td>";
+        html += rangeCellsHtml(summary.grandTotal.monthly);
         summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (summary.grandTotal.monthly[m] ? fmtMoney(summary.grandTotal.monthly[m]) : "") + "</td>"; });
         html += "</tr>";
       }
@@ -2585,6 +2623,7 @@
         html += actualRowHtml("Actual Grand Total", summary.grandTotal.actualMonthly, summary.grandTotal.actualTotal, summary.grandTotal.total, summary.months, colClass);
       } else if (mode === "actual") {
         html += '<tr class="summary-grid__grandtotal"><td class="summary-grid__label">Grand Total</td><td class="col-money summary-grid__budget">' + (summary.grandTotal.actualTotal ? fmtMoney(summary.grandTotal.actualTotal) : "") + "</td>";
+        html += rangeCellsHtml(summary.grandTotal.actualMonthly);
         summary.months.forEach(function (m) { html += '<td class="col-money' + colClass(m) + '">' + (summary.grandTotal.actualMonthly[m] ? fmtMoney(summary.grandTotal.actualMonthly[m]) : "") + "</td>"; });
         html += "</tr>";
       }
@@ -2623,6 +2662,8 @@
       if (highlightBtn) highlightBtn.addEventListener("click", function () { highlightCurrentMonth = !highlightCurrentMonth; render(); });
       var fullWidthBtn = wrap.querySelector("#cfFullWidthBtn");
       if (fullWidthBtn) fullWidthBtn.addEventListener("click", function () { cashflowFullWidth = !cashflowFullWidth; render(); });
+      var showRangeBtn = wrap.querySelector("#cfShowRangeBtn");
+      if (showRangeBtn) showRangeBtn.addEventListener("click", function () { cashflowShowScheduleRange = !cashflowShowScheduleRange; render(); });
       var amountModeSel = wrap.querySelector("#cfAmountMode");
       if (amountModeSel) amountModeSel.addEventListener("change", function () { cashflowAmountMode = amountModeSel.value; render(); });
       var gapInput = wrap.querySelector("#cfSectionGap");
