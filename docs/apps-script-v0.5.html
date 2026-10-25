@@ -189,6 +189,10 @@
   .schedule-editor__even label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-muted); }
   .schedule-editor__hint { font-size: 12px; color: var(--text-secondary); }
   .schedule-editor__variance { font-size: 12px; color: var(--danger); }
+  .schedule-editor__spread { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding-top: 4px; }
+  .schedule-editor__spread-label { font-size: 12px; color: var(--text-muted); }
+  .schedule-editor__spread label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-muted); }
+  .schedule-editor__spread input { width: 130px; }
 
   .actuals-editor { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px dashed var(--border-strong); }
   .actuals-editor__title { font-size: 12px; font-weight: 600; color: var(--actual); }
@@ -1176,6 +1180,31 @@
       buckets.push({ date: y + "-" + String(m + 1).padStart(2, "0") + "-01", amount: amount });
     }
     return buckets;
+  }
+  // Generates one dated entry per month in computeEvenSchedule's spread and appends
+  // each as its own independent entry (same shape as a manually-added one) — a
+  // one-time bulk-add convenience, not a persistent "mode" on the item, so every
+  // generated entry is immediately editable/removable individually afterward.
+  function pushEvenSpreadEntries(targetArray, idPrefix, startDate, endDate, total, extraFields) {
+    computeEvenSchedule(startDate, endDate, total).forEach(function (b) {
+      var entry = { id: genId(idPrefix), date: b.date, amount: b.amount };
+      if (extraFields) Object.keys(extraFields).forEach(function (k) { entry[k] = extraFields[k]; });
+      targetArray.push(entry);
+    });
+  }
+  // kind: "bpayment" (budget item planned payments) or "actual" (the shared actuals
+  // editor's key, itself already "li|<id>" or "bi|<id>"). One generic control +
+  // wireSpreadEvenlyEvents() handler below, keyed by kind, instead of duplicating
+  // this markup/wiring per payment table.
+  function spreadEvenlyHtml(kind, key) {
+    var k = kind + "|" + key;
+    return '<div class="schedule-editor__spread">' +
+      '<span class="schedule-editor__spread-label">or spread evenly</span>' +
+      '<label>Start<input type="date" data-spread-start="' + k + '" /></label>' +
+      '<label>End<input type="date" data-spread-end="' + k + '" /></label>' +
+      '<label>Total<input type="number" placeholder="0.00" data-spread-total="' + k + '" /></label>' +
+      '<button class="link-button" data-spread-add="' + k + '">add</button>' +
+      "</div>";
   }
   function addMonths(iso, months) {
     var p = iso.split("-").map(Number);
@@ -3599,6 +3628,7 @@
     el.appendChild(wrap);
     wireLineItemEvents(el);
     wireActualsEvents(el);
+    wireSpreadEvenlyEvents(el);
   }
 
   // Custom payments are entered independently of totalBudget, so the two can drift
@@ -3667,13 +3697,16 @@
       '<div class="actuals-editor__title">Actuals <span class="actuals-editor__hint">money actually spent — tracked separately from the budget above</span></div>' +
       '<table class="mini-table"><thead><tr><th>Date</th><th>Amount</th><th>Note</th><th></th></tr></thead><tbody>';
     sorted.forEach(function (a) {
-      html += "<tr><td>" + fmtDate(a.date) + "</td><td>" + fmtMoney(a.amount, true) + "</td><td>" + esc(a.note || "") +
-        '</td><td><button class="link-button" data-remove-actual="' + key + "|" + a.id + '">remove</button></td></tr>';
+      html += '<tr><td><input type="date" class="editable-text" value="' + esc(a.date) + '" data-edit-actual-date="' + key + "|" + a.id + '" /></td>' +
+        '<td><input type="number" class="editable-number" value="' + a.amount + '" data-edit-actual-amount="' + key + "|" + a.id + '" /></td>' +
+        '<td><input type="text" class="editable-text" placeholder="note (optional)" value="' + esc(a.note || "") + '" data-edit-actual-note="' + key + "|" + a.id + '" /></td>' +
+        '<td><button class="link-button" data-remove-actual="' + key + "|" + a.id + '">remove</button></td></tr>';
     });
     html += '<tr><td><input type="date" data-new-actual-date="' + key + '" /></td>' +
       '<td><input type="number" placeholder="0.00" data-new-actual-amount="' + key + '" /></td>' +
       '<td><input type="text" placeholder="note (optional)" data-new-actual-note="' + key + '" /></td>' +
       '<td><button class="link-button" data-add-actual="' + key + '">add</button></td></tr></tbody></table>';
+    html += spreadEvenlyHtml("actual", key);
     if (sorted.length) {
       html += '<div class="actuals-editor__total">Actual total ' + fmtMoney(total, true) +
         (budgetTotal ? " vs budget " + fmtMoney(budgetTotal, true) + " (" + (variance > 0 ? "+" : "") + fmtMoney(variance, true) + ")" : "") +
@@ -3706,6 +3739,53 @@
         var parts = btn.getAttribute("data-remove-actual").split("|");
         var entity = findActualsEntity(parts[0], parts[1]);
         entity.actuals = entity.actuals.filter(function (a) { return a.id !== parts[2]; });
+        render();
+        persist();
+      });
+    });
+    function findActual(parts) {
+      var entity = findActualsEntity(parts[0], parts[1]);
+      return entity.actuals.filter(function (a) { return a.id === parts[2]; })[0];
+    }
+    root.querySelectorAll("[data-edit-actual-date]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var a = findActual(input.getAttribute("data-edit-actual-date").split("|"));
+        if (a && input.value) { a.date = input.value; render(); persist(); }
+      });
+    });
+    root.querySelectorAll("[data-edit-actual-amount]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var a = findActual(input.getAttribute("data-edit-actual-amount").split("|"));
+        if (a) { a.amount = Number(input.value) || 0; render(); persist(); }
+      });
+    });
+    root.querySelectorAll("[data-edit-actual-note]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var a = findActual(input.getAttribute("data-edit-actual-note").split("|"));
+        if (a) { a.note = input.value || null; render(); persist(); }
+      });
+    });
+  }
+
+  function wireSpreadEvenlyEvents(root) {
+    root.querySelectorAll("[data-spread-add]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var raw = btn.getAttribute("data-spread-add");
+        var sep = raw.indexOf("|");
+        var kind = raw.slice(0, sep), key = raw.slice(sep + 1);
+        var startInput = root.querySelector('[data-spread-start="' + raw + '"]');
+        var endInput = root.querySelector('[data-spread-end="' + raw + '"]');
+        var totalInput = root.querySelector('[data-spread-total="' + raw + '"]');
+        if (!startInput.value || !endInput.value || !totalInput.value) return;
+        var total = Number(totalInput.value) || 0;
+        if (kind === "bpayment") {
+          pushEvenSpreadEntries(findBudgetItem(key).payments, "bpay", startInput.value, endInput.value, total);
+        } else if (kind === "actual") {
+          var parts = key.split("|");
+          var entity = findActualsEntity(parts[0], parts[1]);
+          if (!entity.actuals) entity.actuals = [];
+          pushEvenSpreadEntries(entity.actuals, "act", startInput.value, endInput.value, total, { note: null });
+        }
         render();
         persist();
       });
@@ -3916,6 +3996,7 @@
     el.appendChild(wrap);
     wireBudgetEvents(el);
     wireActualsEvents(el);
+    wireSpreadEvenlyEvents(el);
   }
 
   function budgetItemRowHtml(bi) {
@@ -3960,10 +4041,13 @@
       var variance = scheduleTotal - bi.totalBudget;
       html += '<div class="schedule-editor__custom"><table class="mini-table"><thead><tr><th>Date</th><th>Amount</th><th></th></tr></thead><tbody>';
       bi.payments.slice().sort(function (a, b) { return a.date.localeCompare(b.date); }).forEach(function (p) {
-        html += "<tr><td>" + fmtDate(p.date) + "</td><td>" + fmtMoney(p.amount, true) + '</td><td><button class="link-button" data-remove-bpayment="' + bi.id + "|" + p.id + '">remove</button></td></tr>';
+        html += '<tr><td><input type="date" class="editable-text" value="' + esc(p.date) + '" data-edit-bpayment-date="' + bi.id + "|" + p.id + '" /></td>' +
+          '<td><input type="number" class="editable-number" value="' + p.amount + '" data-edit-bpayment-amount="' + bi.id + "|" + p.id + '" /></td>' +
+          '<td><button class="link-button" data-remove-bpayment="' + bi.id + "|" + p.id + '">remove</button></td></tr>';
       });
       html += '<tr><td><input type="date" data-new-bpayment-date="' + bi.id + '" /></td><td><input type="number" placeholder="0.00" data-new-bpayment-amount="' + bi.id + '" /></td>' +
         '<td><button class="link-button" data-add-bpayment="' + bi.id + '">add</button></td></tr></tbody></table>';
+      html += spreadEvenlyHtml("bpayment", bi.id);
       if (Math.abs(variance) > 0.01) {
         html += '<div class="schedule-editor__variance">Payments total ' + fmtMoney(scheduleTotal, true) + ", amount is " + fmtMoney(bi.totalBudget, true) + " (" + (variance > 0 ? "+" : "") + fmtMoney(variance, true) + ")</div>";
       }
@@ -4064,6 +4148,22 @@
         bi.payments = bi.payments.filter(function (p) { return p.id !== parts[1]; });
         render();
         persist();
+      });
+    });
+    function findBudgetPayment(parts) {
+      var bi = findBudgetItem(parts[0]);
+      return bi.payments.filter(function (p) { return p.id === parts[1]; })[0];
+    }
+    root.querySelectorAll("[data-edit-bpayment-date]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var p = findBudgetPayment(input.getAttribute("data-edit-bpayment-date").split("|"));
+        if (p && input.value) { p.date = input.value; render(); persist(); }
+      });
+    });
+    root.querySelectorAll("[data-edit-bpayment-amount]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var p = findBudgetPayment(input.getAttribute("data-edit-bpayment-amount").split("|"));
+        if (p) { p.amount = Number(input.value) || 0; render(); persist(); }
       });
     });
   }
