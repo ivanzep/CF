@@ -189,6 +189,13 @@
   .schedule-editor { display: flex; flex-direction: column; gap: 12px; }
   .schedule-editor__mode { display: flex; gap: 24px; font-size: 13px; }
   .schedule-editor__mode label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .schedule-mode-toggle { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; width: fit-content; }
+  .schedule-mode-toggle__btn {
+    background: var(--surface); border: none; padding: 6px 14px; font-size: 13px; line-height: 1.2;
+    color: var(--text-secondary); cursor: pointer; white-space: nowrap;
+  }
+  .schedule-mode-toggle__btn:not(:last-child) { border-right: 1px solid var(--border-strong); }
+  .schedule-mode-toggle__btn--active { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
   .schedule-editor__even { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
   .schedule-editor__even label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-muted); }
   .schedule-editor__hint { font-size: 12px; color: var(--text-secondary); }
@@ -2271,8 +2278,10 @@
     var isEven = li.scheduleMode === "EVEN";
     var html = '<div class="schedule-editor">' +
       '<div class="schedule-editor__mode">' +
-        '<label><input type="radio" name="mode-' + li.id + '"' + (isEven ? " checked" : "") + ' data-mode-radio="' + li.id + '" value="EVEN" /> Spread evenly between dates</label>' +
-        '<label><input type="radio" name="mode-' + li.id + '"' + (!isEven ? " checked" : "") + ' data-mode-radio="' + li.id + '" value="CUSTOM" /> Specific payment dates</label>' +
+        '<div class="schedule-mode-toggle" role="group" aria-label="Schedule mode">' +
+          '<button type="button" class="schedule-mode-toggle__btn' + (!isEven ? " schedule-mode-toggle__btn--active" : "") + '" data-mode-toggle="' + li.id + '" data-mode-value="CUSTOM">Payment date</button>' +
+          '<button type="button" class="schedule-mode-toggle__btn' + (isEven ? " schedule-mode-toggle__btn--active" : "") + '" data-mode-toggle="' + li.id + '" data-mode-value="EVEN">Spread evenly</button>' +
+        "</div>" +
       "</div>";
     if (isEven) {
       var schedule = getLineItemSchedule(li);
@@ -2359,9 +2368,12 @@
         render();
       });
     });
-    root.querySelectorAll("[data-mode-radio]").forEach(function (radio) {
-      radio.addEventListener("change", function () {
-        findLineItem(radio.getAttribute("data-mode-radio")).scheduleMode = radio.value;
+    root.querySelectorAll("[data-mode-toggle]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var li = findLineItem(btn.getAttribute("data-mode-toggle"));
+        var value = btn.getAttribute("data-mode-value");
+        if (li.scheduleMode === value) return;
+        li.scheduleMode = value;
         render();
         persist();
       });
