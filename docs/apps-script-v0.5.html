@@ -183,16 +183,21 @@
 
   .schedule-row td { background: var(--page); padding: 16px !important; }
   .schedule-editor { display: flex; flex-direction: column; gap: 12px; }
-  .schedule-editor__mode { display: flex; gap: 24px; font-size: 13px; }
-  .schedule-editor__mode label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-  .schedule-editor__even { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-  .schedule-editor__even label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-muted); }
   .schedule-editor__hint { font-size: 12px; color: var(--text-secondary); }
   .schedule-editor__variance { font-size: 12px; color: var(--danger); }
-  .schedule-editor__spread { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding-top: 4px; }
-  .schedule-editor__spread-label { font-size: 12px; color: var(--text-muted); }
-  .schedule-editor__spread label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-muted); }
-  .schedule-editor__spread input { width: 130px; }
+
+  /* The "add a payment/actual" control shared by the planned-payment and actuals
+     tables: a segmented toggle (not radio buttons) switches between adding one
+     specific dated entry and bulk-generating several evenly spread across a range. */
+  .payment-add { display: flex; flex-direction: column; gap: 10px; padding-top: 6px; }
+  .payment-add__toggle { display: inline-flex; width: fit-content; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
+  .payment-add__toggle-btn { background: var(--surface); border: none; padding: 5px 12px; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+  .payment-add__toggle-btn:not(:first-child) { border-left: 1px solid var(--border-strong); }
+  .payment-add__toggle-btn--active { background: var(--accent); color: #fff; font-weight: 600; }
+  .payment-add__fields { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+  .payment-add__fields label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-muted); }
+  .payment-add__fields input { width: 130px; }
+  .payment-add__fields input[data-addnew-note], .payment-add__fields input[data-addnew-spreadnote] { width: 170px; }
 
   .actuals-editor { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px dashed var(--border-strong); }
   .actuals-editor__title { font-size: 12px; font-weight: 600; color: var(--actual); }
@@ -1019,14 +1024,27 @@
   }
   // Defensive against a backend that hasn't been redeployed with the newer Code.gs yet
   // (an old deployment's getProject() response simply won't have these fields).
+  // Payments now always live as discrete, individually-editable entries — the old
+  // whole-item "EVEN" mode (a schedule computed on the fly from totalBudget/start/end,
+  // never materialized into entries) is gone from the UI. On load, any item still
+  // carrying that old mode gets its computed schedule turned into real payment rows
+  // once, so existing even-spread schedules survive the switch instead of vanishing.
+  function materializePaymentSchedule(item, idPrefix) {
+    if (!item.payments) item.payments = [];
+    if (item.scheduleMode === "EVEN" && !item.payments.length && item.startDate && item.endDate) {
+      item.payments = computeEvenSchedule(item.startDate.slice(0, 10), item.endDate.slice(0, 10), item.totalBudget)
+        .map(function (b) { return { id: genId(idPrefix), date: b.date, amount: b.amount, note: null }; });
+    }
+    item.scheduleMode = "CUSTOM";
+  }
   function normalizeProject(p) {
     if (!p.budgetSections) p.budgetSections = [];
     if (!p.budgetItems) p.budgetItems = [];
     if (!p.cashflowCellColors) p.cashflowCellColors = [];
     if (!p.capTableSettings) p.capTableSettings = { prefPercent: 0, startDate: null, endDate: null };
     (p.capTable || []).forEach(function (m) { if (!m.capitalReturns) m.capitalReturns = []; });
-    (p.lineItems || []).forEach(function (li) { if (!li.actuals) li.actuals = []; });
-    (p.budgetItems || []).forEach(function (bi) { if (!bi.actuals) bi.actuals = []; });
+    (p.lineItems || []).forEach(function (li) { if (!li.actuals) li.actuals = []; materializePaymentSchedule(li, "pay"); });
+    (p.budgetItems || []).forEach(function (bi) { if (!bi.actuals) bi.actuals = []; materializePaymentSchedule(bi, "bpay"); });
     (p.draws || []).forEach(function (d) {
       if (d.actualDate === undefined) d.actualDate = null;
       if (d.actualAmount === undefined) d.actualAmount = null;
@@ -1192,19 +1210,34 @@
       targetArray.push(entry);
     });
   }
-  // kind: "bpayment" (budget item planned payments) or "actual" (the shared actuals
-  // editor's key, itself already "li|<id>" or "bi|<id>"). One generic control +
-  // wireSpreadEvenlyEvents() handler below, keyed by kind, instead of duplicating
-  // this markup/wiring per payment table.
-  function spreadEvenlyHtml(kind, key) {
-    var k = kind + "|" + key;
-    return '<div class="schedule-editor__spread">' +
-      '<span class="schedule-editor__spread-label">or spread evenly</span>' +
-      '<label>Start<input type="date" data-spread-start="' + k + '" /></label>' +
-      '<label>End<input type="date" data-spread-end="' + k + '" /></label>' +
-      '<label>Total<input type="number" placeholder="0.00" data-spread-total="' + k + '" /></label>' +
-      '<button class="link-button" data-spread-add="' + k + '">add</button>' +
-      "</div>";
+  // The "add a payment/actual" control shared by the planned-payment tables (line
+  // items and budget items) and the actuals ledger: a toggle — not radio buttons —
+  // switches between adding one specific dated entry and bulk-generating several
+  // evenly spread across a date range (reusing pushEvenSpreadEntries below). kind is
+  // "payment" (li.payments), "bpayment" (bi.payments), or "actual" (the shared
+  // actuals editor's key, itself already "li|<id>"/"bi|<id>"); idPrefix is the id
+  // prefix for freshly generated entries ("pay"/"bpay"/"act").
+  var paymentAddMode = {}; // "<kind>|<key>" -> "specific" | "spread"; session-only UI state, not persisted
+  function paymentAddHtml(kind, key, idPrefix) {
+    var fullKey = kind + "|" + key;
+    var mode = paymentAddMode[fullKey] || "specific";
+    var html = '<div class="payment-add">' +
+      '<div class="payment-add__toggle">' +
+        '<button type="button" class="payment-add__toggle-btn' + (mode === "specific" ? " payment-add__toggle-btn--active" : "") + '" data-addmode-btn="' + fullKey + '" data-addmode-value="specific">Specific date</button>' +
+        '<button type="button" class="payment-add__toggle-btn' + (mode === "spread" ? " payment-add__toggle-btn--active" : "") + '" data-addmode-btn="' + fullKey + '" data-addmode-value="spread">Spread evenly</button>' +
+      "</div><div class=\"payment-add__fields\">";
+    if (mode === "spread") {
+      html += '<label>Start<input type="date" data-addnew-start="' + fullKey + '" /></label>' +
+        '<label>End<input type="date" data-addnew-end="' + fullKey + '" /></label>' +
+        '<label>Total<input type="number" placeholder="0.00" data-addnew-total="' + fullKey + '" /></label>' +
+        '<label>Note<input type="text" placeholder="optional" data-addnew-spreadnote="' + fullKey + '" /></label>';
+    } else {
+      html += '<label>Date<input type="date" data-addnew-date="' + fullKey + '" /></label>' +
+        '<label>Amount<input type="number" placeholder="0.00" data-addnew-amount="' + fullKey + '" /></label>' +
+        '<label>Note<input type="text" placeholder="optional" data-addnew-note="' + fullKey + '" /></label>';
+    }
+    html += '<button class="link-button" data-addnew-go="' + fullKey + '" data-addnew-prefix="' + idPrefix + '">add</button></div></div>';
+    return html;
   }
   function addMonths(iso, months) {
     var p = iso.split("-").map(Number);
@@ -1923,13 +1956,12 @@
     return container;
   }
 
+  // Every item's planned schedule is a flat list of dated payment entries now — the
+  // old whole-item "EVEN" mode (schedule computed on the fly, never stored as entries)
+  // is migrated away in normalizeProject(), so this just reads the entries directly.
   function getLineItemSchedule(item) {
-    if (item.scheduleMode === "CUSTOM") {
-      return item.payments.slice().sort(function (a, b) { return a.date.localeCompare(b.date); })
-        .map(function (p) { return { date: p.date.slice(0, 10), amount: p.amount }; });
-    }
-    if (!item.startDate || !item.endDate) return [];
-    return computeEvenSchedule(item.startDate.slice(0, 10), item.endDate.slice(0, 10), item.totalBudget);
+    return item.payments.slice().sort(function (a, b) { return a.date.localeCompare(b.date); })
+      .map(function (p) { return { date: p.date.slice(0, 10), amount: p.amount }; });
   }
   // Actual spend is always a dated ledger — unlike the budget, there's no "even spread"
   // mode for money that's already gone out the door.
@@ -2157,7 +2189,7 @@
     function catName(id) { var c = proj.categories.filter(function (x) { return x.id === id; })[0]; return c ? c.name : ""; }
     var rows = [toCsvRow(["Category", "Code", "Description", "Budget", "Schedule Mode", "Start Date", "End Date", "Payment Date", "Payment Amount"])];
     proj.lineItems.forEach(function (li) {
-      if (li.scheduleMode === "CUSTOM" && li.payments.length) {
+      if (li.payments.length) {
         li.payments.forEach(function (p) {
           rows.push(toCsvRow([catName(li.categoryId), li.code, li.description, money(li.totalBudget), li.scheduleMode, "", "", p.date, money(p.amount)]));
         });
@@ -3628,14 +3660,13 @@
     el.appendChild(wrap);
     wireLineItemEvents(el);
     wireActualsEvents(el);
-    wireSpreadEvenlyEvents(el);
+    wirePaymentAddEvents(el);
   }
 
-  // Custom payments are entered independently of totalBudget, so the two can drift
-  // apart silently — the grid shows totalBudget in the Budget column but sums the
-  // payments into the monthly cells. Returns null when they agree (or can't be compared).
+  // Payments are entered independently of totalBudget, so the two can drift apart
+  // silently — the grid shows totalBudget in the Budget column but sums the payments
+  // into the monthly cells. Returns null when they agree (or can't be compared).
   function scheduleBudgetMismatch(li) {
-    if (li.scheduleMode !== "CUSTOM") return null;
     if (linkedBudgetItemsFor(li).length > 0) return null;
     var payments = getLineItemSchedule(li);
     if (!payments.length) return null;
@@ -3651,9 +3682,7 @@
     var effectiveBudget = effectiveLineItemBudget(li);
     var schedule = getLineItemSchedule(li);
     var mismatch = scheduleBudgetMismatch(li);
-    var summary = li.scheduleMode === "EVEN"
-      ? (li.startDate && li.endDate ? "Even, " + li.startDate + " → " + li.endDate : "Even (set dates)")
-      : schedule.length + " custom payment" + (schedule.length === 1 ? "" : "s");
+    var summary = schedule.length + " payment" + (schedule.length === 1 ? "" : "s");
     var catOptions = '<option value="">Uncategorized</option>' + project.categories.map(function (c) {
       return '<option value="' + c.id + '"' + (li.categoryId === c.id ? " selected" : "") + ">" + esc(c.name) + "</option>";
     }).join("");
@@ -3702,11 +3731,8 @@
         '<td><input type="text" class="editable-text" placeholder="note (optional)" value="' + esc(a.note || "") + '" data-edit-actual-note="' + key + "|" + a.id + '" /></td>' +
         '<td><button class="link-button" data-remove-actual="' + key + "|" + a.id + '">remove</button></td></tr>';
     });
-    html += '<tr><td><input type="date" data-new-actual-date="' + key + '" /></td>' +
-      '<td><input type="number" placeholder="0.00" data-new-actual-amount="' + key + '" /></td>' +
-      '<td><input type="text" placeholder="note (optional)" data-new-actual-note="' + key + '" /></td>' +
-      '<td><button class="link-button" data-add-actual="' + key + '">add</button></td></tr></tbody></table>';
-    html += spreadEvenlyHtml("actual", key);
+    html += '</tbody></table>';
+    html += paymentAddHtml("actual", key, "act");
     if (sorted.length) {
       html += '<div class="actuals-editor__total">Actual total ' + fmtMoney(total, true) +
         (budgetTotal ? " vs budget " + fmtMoney(budgetTotal, true) + " (" + (variance > 0 ? "+" : "") + fmtMoney(variance, true) + ")" : "") +
@@ -3719,21 +3745,6 @@
   function findActualsEntity(kind, id) { return kind === "li" ? findLineItem(id) : findBudgetItem(id); }
 
   function wireActualsEvents(root) {
-    root.querySelectorAll("[data-add-actual]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var parts = btn.getAttribute("data-add-actual").split("|");
-        var entity = findActualsEntity(parts[0], parts[1]);
-        var key = parts[0] + "|" + parts[1];
-        var dateInput = root.querySelector('[data-new-actual-date="' + key + '"]');
-        var amountInput = root.querySelector('[data-new-actual-amount="' + key + '"]');
-        var noteInput = root.querySelector('[data-new-actual-note="' + key + '"]');
-        if (!dateInput.value || !amountInput.value) return;
-        if (!entity.actuals) entity.actuals = [];
-        entity.actuals.push({ id: genId("act"), date: dateInput.value, amount: Number(amountInput.value), note: noteInput.value || null });
-        render();
-        persist();
-      });
-    });
     root.querySelectorAll("[data-remove-actual]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var parts = btn.getAttribute("data-remove-actual").split("|");
@@ -3767,24 +3778,44 @@
     });
   }
 
-  function wireSpreadEvenlyEvents(root) {
-    root.querySelectorAll("[data-spread-add]").forEach(function (btn) {
+  function paymentAddTargetFor(kind, key) {
+    if (kind === "payment") return findLineItem(key).payments;
+    if (kind === "bpayment") return findBudgetItem(key).payments;
+    if (kind === "actual") {
+      var parts = key.split("|");
+      var entity = findActualsEntity(parts[0], parts[1]);
+      if (!entity.actuals) entity.actuals = [];
+      return entity.actuals;
+    }
+    return null;
+  }
+  function wirePaymentAddEvents(root) {
+    root.querySelectorAll("[data-addmode-btn]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var raw = btn.getAttribute("data-spread-add");
-        var sep = raw.indexOf("|");
-        var kind = raw.slice(0, sep), key = raw.slice(sep + 1);
-        var startInput = root.querySelector('[data-spread-start="' + raw + '"]');
-        var endInput = root.querySelector('[data-spread-end="' + raw + '"]');
-        var totalInput = root.querySelector('[data-spread-total="' + raw + '"]');
-        if (!startInput.value || !endInput.value || !totalInput.value) return;
-        var total = Number(totalInput.value) || 0;
-        if (kind === "bpayment") {
-          pushEvenSpreadEntries(findBudgetItem(key).payments, "bpay", startInput.value, endInput.value, total);
-        } else if (kind === "actual") {
-          var parts = key.split("|");
-          var entity = findActualsEntity(parts[0], parts[1]);
-          if (!entity.actuals) entity.actuals = [];
-          pushEvenSpreadEntries(entity.actuals, "act", startInput.value, endInput.value, total, { note: null });
+        paymentAddMode[btn.getAttribute("data-addmode-btn")] = btn.getAttribute("data-addmode-value");
+        render();
+      });
+    });
+    root.querySelectorAll("[data-addnew-go]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var fullKey = btn.getAttribute("data-addnew-go");
+        var idPrefix = btn.getAttribute("data-addnew-prefix");
+        var sep = fullKey.indexOf("|");
+        var target = paymentAddTargetFor(fullKey.slice(0, sep), fullKey.slice(sep + 1));
+        if (!target) return;
+        if ((paymentAddMode[fullKey] || "specific") === "spread") {
+          var startInput = root.querySelector('[data-addnew-start="' + fullKey + '"]');
+          var endInput = root.querySelector('[data-addnew-end="' + fullKey + '"]');
+          var totalInput = root.querySelector('[data-addnew-total="' + fullKey + '"]');
+          var spreadNoteInput = root.querySelector('[data-addnew-spreadnote="' + fullKey + '"]');
+          if (!startInput.value || !endInput.value || !totalInput.value) return;
+          pushEvenSpreadEntries(target, idPrefix, startInput.value, endInput.value, Number(totalInput.value) || 0, { note: spreadNoteInput.value || null });
+        } else {
+          var dateInput = root.querySelector('[data-addnew-date="' + fullKey + '"]');
+          var amountInput = root.querySelector('[data-addnew-amount="' + fullKey + '"]');
+          var noteInput = root.querySelector('[data-addnew-note="' + fullKey + '"]');
+          if (!dateInput.value || !amountInput.value) return;
+          target.push({ id: genId(idPrefix), date: dateInput.value, amount: Number(amountInput.value), note: noteInput.value || null });
         }
         render();
         persist();
@@ -3793,34 +3824,19 @@
   }
 
   function scheduleEditorHtml(li) {
-    var isEven = li.scheduleMode === "EVEN";
-    var html = '<div class="schedule-editor">' +
-      '<div class="schedule-editor__mode">' +
-        '<label><input type="radio" name="mode-' + li.id + '"' + (isEven ? " checked" : "") + ' data-mode-radio="' + li.id + '" value="EVEN" /> Spread evenly between dates</label>' +
-        '<label><input type="radio" name="mode-' + li.id + '"' + (!isEven ? " checked" : "") + ' data-mode-radio="' + li.id + '" value="CUSTOM" /> Specific payment dates</label>' +
-      "</div>";
-    if (isEven) {
-      var schedule = getLineItemSchedule(li);
-      html += '<div class="schedule-editor__even">' +
-        '<label>Start<input type="date" value="' + esc(li.startDate || "") + '" data-even-field="startDate" data-item-id="' + li.id + '" /></label>' +
-        '<label>End<input type="date" value="' + esc(li.endDate || "") + '" data-even-field="endDate" data-item-id="' + li.id + '" /></label>';
-      if (li.startDate && li.endDate) {
-        html += '<span class="schedule-editor__hint">' + schedule.length + " monthly payment" + (schedule.length === 1 ? "" : "s") + " of " + fmtMoney(li.totalBudget / Math.max(schedule.length, 1)) + " each</span>";
-      }
-      html += "</div>";
-    } else {
-      var scheduleTotal = sum(li.payments.map(function (p) { return p.amount; }));
-      var variance = scheduleTotal - li.totalBudget;
-      html += '<div class="schedule-editor__custom"><table class="mini-table"><thead><tr><th>Date</th><th>Amount</th><th></th></tr></thead><tbody>';
-      li.payments.slice().sort(function (a, b) { return a.date.localeCompare(b.date); }).forEach(function (p) {
-        html += "<tr><td>" + fmtDate(p.date) + "</td><td>" + fmtMoney(p.amount, true) + '</td><td><button class="link-button" data-remove-payment="' + li.id + "|" + p.id + '">remove</button></td></tr>';
-      });
-      html += '<tr><td><input type="date" data-new-payment-date="' + li.id + '" /></td><td><input type="number" placeholder="0.00" data-new-payment-amount="' + li.id + '" /></td>' +
-        '<td><button class="link-button" data-add-payment="' + li.id + '">add</button></td></tr></tbody></table>';
-      if (Math.abs(variance) > 0.01) {
-        html += '<div class="schedule-editor__variance">Payments total ' + fmtMoney(scheduleTotal, true) + ", budget is " + fmtMoney(li.totalBudget, true) + " (" + (variance > 0 ? "+" : "") + fmtMoney(variance, true) + ")</div>";
-      }
-      html += "</div>";
+    var scheduleTotal = sum(li.payments.map(function (p) { return p.amount; }));
+    var variance = scheduleTotal - li.totalBudget;
+    var html = '<div class="schedule-editor"><table class="mini-table"><thead><tr><th>Date</th><th>Amount</th><th>Note</th><th></th></tr></thead><tbody>';
+    li.payments.slice().sort(function (a, b) { return a.date.localeCompare(b.date); }).forEach(function (p) {
+      html += '<tr><td><input type="date" class="editable-text" value="' + esc(p.date) + '" data-edit-payment-date="' + li.id + "|" + p.id + '" /></td>' +
+        '<td><input type="number" class="editable-number" value="' + p.amount + '" data-edit-payment-amount="' + li.id + "|" + p.id + '" /></td>' +
+        '<td><input type="text" class="editable-text" placeholder="note (optional)" value="' + esc(p.note || "") + '" data-edit-payment-note="' + li.id + "|" + p.id + '" /></td>' +
+        '<td><button class="link-button" data-remove-payment="' + li.id + "|" + p.id + '">remove</button></td></tr>';
+    });
+    html += "</tbody></table>";
+    html += paymentAddHtml("payment", li.id, "pay");
+    if (Math.abs(variance) > 0.01) {
+      html += '<div class="schedule-editor__variance">Payments total ' + fmtMoney(scheduleTotal, true) + ", budget is " + fmtMoney(li.totalBudget, true) + " (" + (variance > 0 ? "+" : "") + fmtMoney(variance, true) + ")</div>";
     }
     html += actualsEditorHtml("li", li.id, li.actuals || [], li.totalBudget);
     html += "</div>";
@@ -3862,7 +3878,7 @@
     root.querySelectorAll("[data-add-item]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var catId = btn.getAttribute("data-add-item") || null;
-        project.lineItems.push({ id: genId("li"), categoryId: catId, code: "", description: "New line item", totalBudget: 0, scheduleMode: "EVEN", startDate: null, endDate: null, sortOrder: project.lineItems.length, payments: [], actuals: [], color: null });
+        project.lineItems.push({ id: genId("li"), categoryId: catId, code: "", description: "New line item", totalBudget: 0, scheduleMode: "CUSTOM", startDate: null, endDate: null, sortOrder: project.lineItems.length, payments: [], actuals: [], color: null });
         render();
         persist();
       });
@@ -3885,31 +3901,6 @@
         render();
       });
     });
-    root.querySelectorAll("[data-mode-radio]").forEach(function (radio) {
-      radio.addEventListener("change", function () {
-        findLineItem(radio.getAttribute("data-mode-radio")).scheduleMode = radio.value;
-        render();
-        persist();
-      });
-    });
-    root.querySelectorAll("[data-even-field]").forEach(function (input) {
-      input.addEventListener("change", function () {
-        findLineItem(input.getAttribute("data-item-id"))[input.getAttribute("data-even-field")] = input.value;
-        render();
-        persist();
-      });
-    });
-    root.querySelectorAll("[data-add-payment]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var id = btn.getAttribute("data-add-payment");
-        var dateInput = root.querySelector('[data-new-payment-date="' + id + '"]');
-        var amountInput = root.querySelector('[data-new-payment-amount="' + id + '"]');
-        if (!dateInput.value || !amountInput.value) return;
-        findLineItem(id).payments.push({ id: genId("pay"), date: dateInput.value, amount: Number(amountInput.value) });
-        render();
-        persist();
-      });
-    });
     root.querySelectorAll("[data-remove-payment]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var parts = btn.getAttribute("data-remove-payment").split("|");
@@ -3917,6 +3908,28 @@
         li.payments = li.payments.filter(function (p) { return p.id !== parts[1]; });
         render();
         persist();
+      });
+    });
+    function findLineItemPayment(parts) {
+      var li = findLineItem(parts[0]);
+      return li.payments.filter(function (p) { return p.id === parts[1]; })[0];
+    }
+    root.querySelectorAll("[data-edit-payment-date]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var p = findLineItemPayment(input.getAttribute("data-edit-payment-date").split("|"));
+        if (p && input.value) { p.date = input.value; render(); persist(); }
+      });
+    });
+    root.querySelectorAll("[data-edit-payment-amount]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var p = findLineItemPayment(input.getAttribute("data-edit-payment-amount").split("|"));
+        if (p) { p.amount = Number(input.value) || 0; render(); persist(); }
+      });
+    });
+    root.querySelectorAll("[data-edit-payment-note]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var p = findLineItemPayment(input.getAttribute("data-edit-payment-note").split("|"));
+        if (p) { p.note = input.value || null; render(); persist(); }
       });
     });
   }
@@ -3996,14 +4009,12 @@
     el.appendChild(wrap);
     wireBudgetEvents(el);
     wireActualsEvents(el);
-    wireSpreadEvenlyEvents(el);
+    wirePaymentAddEvents(el);
   }
 
   function budgetItemRowHtml(bi) {
     var schedule = getLineItemSchedule(bi);
-    var summary = bi.scheduleMode === "EVEN"
-      ? (bi.startDate && bi.endDate ? "Even, " + bi.startDate + " → " + bi.endDate : "Even (set dates)")
-      : schedule.length + " custom payment" + (schedule.length === 1 ? "" : "s");
+    var summary = schedule.length + " payment" + (schedule.length === 1 ? "" : "s");
     var linkedLi = bi.linkedLineItemId ? findLineItem(bi.linkedLineItemId) : null;
     var rows = '<tr data-bitem-row="' + bi.id + '">' +
       '<td><input class="editable-text" value="' + esc(bi.description) + '" data-bitem-field="description" data-bitem-id="' + bi.id + '" /></td>' +
@@ -4021,37 +4032,19 @@
   }
 
   function budgetScheduleEditorHtml(bi) {
-    var isEven = bi.scheduleMode === "EVEN";
-    var html = '<div class="schedule-editor">' +
-      '<div class="schedule-editor__mode">' +
-        '<label><input type="radio" name="bmode-' + bi.id + '"' + (isEven ? " checked" : "") + ' data-bmode-radio="' + bi.id + '" value="EVEN" /> Spread evenly between dates</label>' +
-        '<label><input type="radio" name="bmode-' + bi.id + '"' + (!isEven ? " checked" : "") + ' data-bmode-radio="' + bi.id + '" value="CUSTOM" /> Specific payment dates</label>' +
-      "</div>";
-    if (isEven) {
-      var schedule = getLineItemSchedule(bi);
-      html += '<div class="schedule-editor__even">' +
-        '<label>Start<input type="date" value="' + esc(bi.startDate || "") + '" data-beven-field="startDate" data-bitem-id="' + bi.id + '" /></label>' +
-        '<label>End<input type="date" value="' + esc(bi.endDate || "") + '" data-beven-field="endDate" data-bitem-id="' + bi.id + '" /></label>';
-      if (bi.startDate && bi.endDate) {
-        html += '<span class="schedule-editor__hint">' + schedule.length + " monthly payment" + (schedule.length === 1 ? "" : "s") + " of " + fmtMoney(bi.totalBudget / Math.max(schedule.length, 1)) + " each</span>";
-      }
-      html += "</div>";
-    } else {
-      var scheduleTotal = sum(bi.payments.map(function (p) { return p.amount; }));
-      var variance = scheduleTotal - bi.totalBudget;
-      html += '<div class="schedule-editor__custom"><table class="mini-table"><thead><tr><th>Date</th><th>Amount</th><th></th></tr></thead><tbody>';
-      bi.payments.slice().sort(function (a, b) { return a.date.localeCompare(b.date); }).forEach(function (p) {
-        html += '<tr><td><input type="date" class="editable-text" value="' + esc(p.date) + '" data-edit-bpayment-date="' + bi.id + "|" + p.id + '" /></td>' +
-          '<td><input type="number" class="editable-number" value="' + p.amount + '" data-edit-bpayment-amount="' + bi.id + "|" + p.id + '" /></td>' +
-          '<td><button class="link-button" data-remove-bpayment="' + bi.id + "|" + p.id + '">remove</button></td></tr>';
-      });
-      html += '<tr><td><input type="date" data-new-bpayment-date="' + bi.id + '" /></td><td><input type="number" placeholder="0.00" data-new-bpayment-amount="' + bi.id + '" /></td>' +
-        '<td><button class="link-button" data-add-bpayment="' + bi.id + '">add</button></td></tr></tbody></table>';
-      html += spreadEvenlyHtml("bpayment", bi.id);
-      if (Math.abs(variance) > 0.01) {
-        html += '<div class="schedule-editor__variance">Payments total ' + fmtMoney(scheduleTotal, true) + ", amount is " + fmtMoney(bi.totalBudget, true) + " (" + (variance > 0 ? "+" : "") + fmtMoney(variance, true) + ")</div>";
-      }
-      html += "</div>";
+    var scheduleTotal = sum(bi.payments.map(function (p) { return p.amount; }));
+    var variance = scheduleTotal - bi.totalBudget;
+    var html = '<div class="schedule-editor"><table class="mini-table"><thead><tr><th>Date</th><th>Amount</th><th>Note</th><th></th></tr></thead><tbody>';
+    bi.payments.slice().sort(function (a, b) { return a.date.localeCompare(b.date); }).forEach(function (p) {
+      html += '<tr><td><input type="date" class="editable-text" value="' + esc(p.date) + '" data-edit-bpayment-date="' + bi.id + "|" + p.id + '" /></td>' +
+        '<td><input type="number" class="editable-number" value="' + p.amount + '" data-edit-bpayment-amount="' + bi.id + "|" + p.id + '" /></td>' +
+        '<td><input type="text" class="editable-text" placeholder="note (optional)" value="' + esc(p.note || "") + '" data-edit-bpayment-note="' + bi.id + "|" + p.id + '" /></td>' +
+        '<td><button class="link-button" data-remove-bpayment="' + bi.id + "|" + p.id + '">remove</button></td></tr>';
+    });
+    html += "</tbody></table>";
+    html += paymentAddHtml("bpayment", bi.id, "bpay");
+    if (Math.abs(variance) > 0.01) {
+      html += '<div class="schedule-editor__variance">Payments total ' + fmtMoney(scheduleTotal, true) + ", amount is " + fmtMoney(bi.totalBudget, true) + " (" + (variance > 0 ? "+" : "") + fmtMoney(variance, true) + ")</div>";
     }
     html += actualsEditorHtml("bi", bi.id, bi.actuals || [], bi.totalBudget);
     html += "</div>";
@@ -4093,7 +4086,7 @@
     root.querySelectorAll("[data-add-bitem]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var secId = btn.getAttribute("data-add-bitem") || null;
-        project.budgetItems.push({ id: genId("bi"), sectionId: secId, description: "New budget line", linkedLineItemId: null, totalBudget: 0, scheduleMode: "EVEN", startDate: null, endDate: null, sortOrder: project.budgetItems.length, payments: [], actuals: [] });
+        project.budgetItems.push({ id: genId("bi"), sectionId: secId, description: "New budget line", linkedLineItemId: null, totalBudget: 0, scheduleMode: "CUSTOM", startDate: null, endDate: null, sortOrder: project.budgetItems.length, payments: [], actuals: [] });
         render();
         persist();
       });
@@ -4114,31 +4107,6 @@
         var id = btn.getAttribute("data-toggle-bschedule");
         expandedBudgetItemId = expandedBudgetItemId === id ? null : id;
         render();
-      });
-    });
-    root.querySelectorAll("[data-bmode-radio]").forEach(function (radio) {
-      radio.addEventListener("change", function () {
-        findBudgetItem(radio.getAttribute("data-bmode-radio")).scheduleMode = radio.value;
-        render();
-        persist();
-      });
-    });
-    root.querySelectorAll("[data-beven-field]").forEach(function (input) {
-      input.addEventListener("change", function () {
-        findBudgetItem(input.getAttribute("data-bitem-id"))[input.getAttribute("data-beven-field")] = input.value;
-        render();
-        persist();
-      });
-    });
-    root.querySelectorAll("[data-add-bpayment]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var id = btn.getAttribute("data-add-bpayment");
-        var dateInput = root.querySelector('[data-new-bpayment-date="' + id + '"]');
-        var amountInput = root.querySelector('[data-new-bpayment-amount="' + id + '"]');
-        if (!dateInput.value || !amountInput.value) return;
-        findBudgetItem(id).payments.push({ id: genId("bpay"), date: dateInput.value, amount: Number(amountInput.value) });
-        render();
-        persist();
       });
     });
     root.querySelectorAll("[data-remove-bpayment]").forEach(function (btn) {
@@ -4164,6 +4132,12 @@
       input.addEventListener("change", function () {
         var p = findBudgetPayment(input.getAttribute("data-edit-bpayment-amount").split("|"));
         if (p) { p.amount = Number(input.value) || 0; render(); persist(); }
+      });
+    });
+    root.querySelectorAll("[data-edit-bpayment-note]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var p = findBudgetPayment(input.getAttribute("data-edit-bpayment-note").split("|"));
+        if (p) { p.note = input.value || null; render(); persist(); }
       });
     });
   }
@@ -4361,12 +4335,14 @@
             newCats++;
           }
         }
-        project.lineItems.push({
+        var importedLi = {
           id: genId("li"), categoryId: categoryId, code: cell(row, "code"), description: description,
           totalBudget: parseCsvNumber(cell(row, "totalBudget")), scheduleMode: "EVEN",
           startDate: parseCsvDate(cell(row, "startDate")), endDate: parseCsvDate(cell(row, "endDate")),
           sortOrder: project.lineItems.length, payments: [], actuals: [], color: null,
-        });
+        };
+        materializePaymentSchedule(importedLi, "pay");
+        project.lineItems.push(importedLi);
         imported++;
       });
       closeCsvImport();
@@ -4403,12 +4379,14 @@
           if (match) linkedLineItemId = match.id;
           else unmatched++;
         }
-        project.budgetItems.push({
+        var importedBi = {
           id: genId("bi"), sectionId: sectionId, description: description, linkedLineItemId: linkedLineItemId,
           totalBudget: parseCsvNumber(cell(row, "totalBudget")), scheduleMode: "EVEN",
           startDate: parseCsvDate(cell(row, "startDate")), endDate: parseCsvDate(cell(row, "endDate")),
           sortOrder: project.budgetItems.length, payments: [], actuals: [],
-        });
+        };
+        materializePaymentSchedule(importedBi, "bpay");
+        project.budgetItems.push(importedBi);
         importedB++;
       });
       closeCsvImport();
